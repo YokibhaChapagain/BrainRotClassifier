@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Brain Rot Feed</title>
+<style>
+  :root {
+    --bg: #0b0b0d; --stage: #000; --ink: #f4f4f6; --muted: #a3a3ad; --glass: rgba(18, 18, 22, .62);
+    --line: rgba(255, 255, 255, .14); --sheet: #17171b; --track: #2b2b31;
+    --rot: #ff4d7d; --ok: #3ddc84; --warn: #ffb347; --accent: #8fa2ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink);
+               font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  /* phone-shaped column on desktop, full screen on a phone */
+  .app { position: relative; height: 100dvh; margin: 0 auto; width: min(100vw, calc(100dvh * 9 / 16)); background: var(--stage); }
+  @media (max-width: 600px) { .app { width: 100vw; } }
+
+  .top { position: absolute; z-index: 20; inset: 0 0 auto 0; display: flex; align-items: center; gap: 8px;
+         padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+         background: linear-gradient(rgba(0,0,0,.55), transparent); pointer-events: none; }
+  .top > * { pointer-events: auto; }
+  .brand { font-weight: 750; letter-spacing: -.01em; font-size: 15px; margin-right: auto; text-shadow: 0 1px 2px #000; }
+  .seg { display: flex; background: var(--glass); border: 1px solid var(--line); border-radius: 999px; padding: 2px;
+         backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .seg button { border: 0; background: none; padding: 5px 11px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--muted); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #000; }
+  .icon-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--glass);
+              display: grid; place-items: center; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .icon-btn svg { width: 18px; height: 18px; }
+
+  .feed { height: 100%; overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; overscroll-behavior: contain; }
+  .feed::-webkit-scrollbar { display: none; }
+  .slide { position: relative; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; overflow: hidden; background: #000; }
+  .slide video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; transition: filter .25s; }
+  .slide.gated video { filter: blur(28px) brightness(.55); }
+
+  .badge { position: absolute; z-index: 5; left: 12px; top: calc(58px + env(safe-area-inset-top)); display: inline-flex; align-items: center; gap: 7px;
+           padding: 6px 11px 6px 9px; border-radius: 999px; font-weight: 700; font-size: 13px; background: var(--glass);
+           border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .badge .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 30%, transparent); }
+  .badge .n { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 600; }
+  .badge.rot { --c: var(--rot); } .badge.ok { --c: var(--ok); }
+
+  .rail { position: absolute; z-index: 7; right: 10px; bottom: calc(110px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 14px; align-items: center; }
+  .rail button { border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; text-shadow: 0 1px 2px #000; }
+  .rail .circle { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: var(--glass); border: 1px solid var(--line); }
+  .rail .score { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--c); }
+  .rail svg { width: 22px; height: 22px; }
+
+  .caption { position: absolute; z-index: 4; inset: auto 70px 0 0; padding: 40px 14px calc(18px + env(safe-area-inset-bottom));
+             background: linear-gradient(transparent, rgba(0,0,0,.75)); }
+  .caption .name { font-weight: 700; margin-bottom: 4px; text-shadow: 0 1px 2px #000; overflow-wrap: anywhere; }
+  .caption .sum { color: #e6e6ea; font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-shadow: 0 1px 2px #000; }
+
+  .gate { position: absolute; z-index: 6; inset: 0; display: none; place-items: center; padding: 24px; text-align: center; }
+  .slide.gated .gate { display: grid; }
+  .gate .card { max-width: 300px; background: var(--glass); border: 1px solid var(--line); border-radius: 16px; padding: 20px;
+                backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+  .gate h2 { margin: 0 0 6px; font-size: 18px; }
+  .gate p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+  .gate .tropes { color: var(--ink); font-size: 13px; margin-bottom: 14px; }
+  .gate .row { display: flex; gap: 8px; }
+  .gate button { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: transparent; font-weight: 650; font-size: 14px; }
+  .gate button.primary { background: var(--ink); color: #000; border-color: var(--ink); }
+
+  .tap-hint { position: absolute; z-index: 3; inset: 0; display: grid; place-items: center; pointer-events: none; opacity: 0; transition: opacity .2s; }
+  .tap-hint.show { opacity: 1; }
+  .tap-hint svg { width: 64px; height: 64px; opacity: .85; filter: drop-shadow(0 2px 6px #000); }
+
+  .stats { position: absolute; z-index: 20; left: 50%; transform: translateX(-50%); bottom: calc(6px + env(safe-area-inset-bottom));
+           font-size: 11px; color: var(--muted); background: var(--glass); padding: 3px 10px; border-radius: 999px; white-space: nowrap; pointer-events: none; }
+
+  /* explanation sheet */
+  .scrim { position: absolute; z-index: 30; inset: 0; background: rgba(0,0,0,.45); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+  .sheet { position: absolute; z-index: 31; inset: auto 0 0 0; max-height: 78%; overflow-y: auto; background: var(--sheet);
+           border-radius: 18px 18px 0 0; padding: 10px 18px calc(22px + env(safe-area-inset-bottom)); transform: translateY(102%); transition: transform .25s ease; }
+  .sheet.open { transform: none; }
+  .grab { width: 38px; height: 4px; border-radius: 2px; background: var(--track); margin: 0 auto 14px; }
+  .verdict { display: flex; gap: 16px; align-items: center; margin-bottom: 6px; }
+  .gauge { --v: 0; --c: var(--ok); width: 76px; height: 76px; flex: none; border-radius: 50%; display: grid; place-items: center;
+           background: conic-gradient(var(--c) calc(var(--v) * 1%), var(--track) 0); }
+  .gauge > div { width: 60px; height: 60px; border-radius: 50%; background: var(--sheet); display: grid; place-items: center; font-size: 21px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .verdict .lbl { font-size: 19px; font-weight: 800; }
+  .verdict .meta { color: var(--muted); font-size: 12px; }
+  .sheet h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 18px 0 8px; }
+  .sheet p { margin: 0; font-size: 14px; }
+  .crit { display: grid; grid-template-columns: 1fr 22px; gap: 3px 10px; margin: 7px 0; font-size: 13px; }
+  .crit .bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+  .crit .bar > span { display: block; height: 100%; border-radius: 3px; }
+  .crit .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { padding: 3px 10px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); }
+  .chip.bad { border-color: var(--rot); color: var(--rot); } .chip.good { border-color: var(--ok); color: var(--ok); }
+  .sigs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .sig { background: #0f0f12; border-radius: 10px; padding: 8px 10px; font-size: 11px; color: var(--muted); }
+  .sig b { display: block; font-size: 16px; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* adding a video */
+  .drop { position: absolute; z-index: 40; inset: 10px; border: 2px dashed var(--accent); border-radius: 18px; display: none;
+          place-items: center; text-align: center; background: rgba(11, 11, 13, .82); color: var(--muted); padding: 24px; pointer-events: none; }
+  .drop.show { display: grid; }
+  .drop b { display: block; color: var(--ink); font-size: 18px; margin-bottom: 4px; }
+  .upcard { position: absolute; z-index: 35; left: 12px; right: 12px; top: calc(56px + env(safe-area-inset-top)); display: none;
+            background: var(--sheet); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  .upcard.show { display: block; }
+  .upcard .head { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 14px; }
+  .upcard .head .t { margin-left: auto; color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; font-size: 12px; }
+  .upcard .file { color: var(--muted); font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .upcard .prog { height: 4px; border-radius: 2px; background: var(--track); margin-top: 10px; overflow: hidden; }
+  .upcard .prog > span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+  .upcard .prog.busy > span { width: 35%; animation: slide 1.1s ease-in-out infinite; }
+  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+  .upcard .msg { font-size: 13px; margin-top: 8px; color: var(--muted); }
+  .upcard.err { border-color: var(--rot); } .upcard.err .msg { color: var(--rot); }
+  .upcard .x { border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; padding: 0 2px; }
+  .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--track); border-top-color: var(--accent); animation: rot .8s linear infinite; flex: none; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+  .new-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--accent); color: #000; vertical-align: 1px; }
+
+  .empty { height: 100%; display: grid; place-items: center; padding: 28px; text-align: center; color: var(--muted); }
+  .empty h2 { color: var(--ink); font-size: 18px; margin: 0 0 8px; }
+  .empty code { background: #1d1d22; color: var(--ink); padding: 2px 7px; border-radius: 6px; font-size: 13px; }
+  .end { height: 100%; scroll-snap-align: start; display: grid; place-items: center; text-align: center; color: var(--muted); padding: 24px; }
+  .end b { color: var(--ink); display: block; font-size: 17px; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="brand">Brain Rot Feed</div>
+    <div class="seg" role="group" aria-label="What the platform does with flagged videos">
+      <button data-policy="label" title="Show every video with its verdict">Label</button>
+      <button data-policy="warn" title="Blur flagged videos behind a warning">Warn</button>
+      <button data-policy="hide" title="Remove flagged videos from the feed">Hide</button>
+    </div>
+    <button class="icon-btn" id="add" aria-label="Add a video" title="Add a video (or drop one on the page)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <button class="icon-btn" id="sound" aria-label="Unmute"></button>
+    <input type="file" id="file" accept="video/*" hidden>
+  </div>
+  <div class="drop" id="drop"><div><b>Drop a video to add it</b>Gemini classifies it once, then it joins the feed</div></div>
+  <div class="upcard" id="upcard" role="status" aria-live="polite"></div>
+  <div class="feed" id="feed"></div>
+  <div class="stats" id="stats"></div>
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="sheet" role="dialog" aria-label="Why this verdict"></div>
+</div>
+
+<script>
+const ICON = {
+  muted: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>',
+  sound: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>',
+  info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>',
+};
+const CRIT = {
+  overstimulation: "Overstimulation", low_informational_value: "Low informational value",
+  incoherence_absurdism: "Incoherence / absurdism", meme_slang_density: "Meme slang density",
+  split_screen_or_filler_gameplay: "Split-screen / filler gameplay", ai_slop_or_tts: "AI slop / TTS",
+  engagement_bait: "Engagement bait",
+};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
+                set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+
+let items = [], pending = [], policy = store.get("brf.policy", "label"), muted = true;
+const allowed = new Set();   // flagged videos the viewer chose to watch anyway (warn mode)
+const seen = new Map();      // id -> is_brain_rot, for the session counter
+let observer = null;
+
+function badge(it) {
+  return `<div class="badge ${it.is_brain_rot ? "rot" : "ok"}"><span class="dot"></span>${it.is_brain_rot ? "Brain rot" : "Not brain rot"}<span class="n">${it.score}</span></div>`;
+}
+
+function slide(it) {
+  const tropes = it.tropes.slice(0, 3).map(esc).join(" · ");
+  return `<section class="slide" data-id="${esc(it.id)}">
+    <video src="${esc(it.src)}" loop playsinline muted preload="metadata"></video>
+    <div class="tap-hint">${ICON.play}</div>
+    ${badge(it)}
+    <div class="rail">
+      <button data-why aria-label="Why this verdict"><span class="circle" style="--c:${it.is_brain_rot ? "var(--rot)" : "var(--ok)"}"><span class="score">${it.score}</span></span>score</button>
+      <button data-why aria-label="Details"><span class="circle">${ICON.info}</span>why</button>
+    </div>
+    <div class="caption"><div class="name">${esc(it.id)}${it.uploaded ? '<span class="new-tag">added</span>' : ""}</div><div class="sum">${esc(it.summary)}</div></div>
+    <div class="gate"><div class="card">
+      <h2>Flagged as brain rot</h2>
+      <p>Our classifier scored this ${it.score}/100 before it was ever shown to you.</p>
+      ${tropes ? `<div class="tropes">${tropes}</div>` : ""}
+      <div class="row"><button data-skip>Skip</button><button class="primary" data-allow>Watch anyway</button></div>
+    </div></div>
+  </section>`;
+}
+
+function render() {
+  const feed = $("feed");
+  document.querySelectorAll(".seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.policy === policy)));
+  if (!items.length) {
+    feed.innerHTML = `<div class="empty"><div><h2>No classified videos yet</h2>
+      <p>${pending.length ? `${pending.length} video(s) are waiting to be classified.` : "Put some .mp4 files in <code>samples/</code>."}</p>
+      <p>Then run <code>brainrot index samples/</code> and reload, or press + to add one now.</p></div></div>`;
+    updateStats();
+    return;
+  }
+  const visible = policy === "hide" ? items.filter((it) => !it.is_brain_rot) : items;
+  const hidden = items.length - visible.length;
+  feed.innerHTML = visible.map(slide).join("") +
+    `<div class="end"><div><b>You're all caught up</b>${hidden ? `${hidden} brain rot video${hidden > 1 ? "s were" : " was"} filtered out of this feed.` : "Every video in the folder has been shown."}
+     ${pending.length ? `<br>${pending.length} new video(s) not classified yet: run <code>brainrot index</code>.` : ""}</div></div>`;
+  feed.scrollTop = 0;
+  feed.querySelectorAll(".slide").forEach(applyGate);
+  watch();
+  updateStats();
+}
+
+const byId = (id) => items.find((it) => it.id === id);
+function applyGate(el) {
+  const it = byId(el.dataset.id);
+  const gated = policy === "warn" && it.is_brain_rot && !allowed.has(it.id);
+  el.classList.toggle("gated", gated);
+  if (gated) el.querySelector("video").pause();
+}
+
+function watch() {
+  observer?.disconnect();
+  observer = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      const v = e.target.querySelector("video");
+      if (e.isIntersecting && e.intersectionRatio >= 0.6) {
+        current = e.target;
+        v.muted = muted;
+        const it = byId(e.target.dataset.id);
+        seen.set(it.id, it.is_brain_rot);
+        updateStats();
+        if (!e.target.classList.contains("gated")) v.play().catch(() => showTap(e.target, true));
+        // warm up the next video so swiping feels instant
+        const nextV = e.target.nextElementSibling?.querySelector?.("video");
+        if (nextV) nextV.preload = "auto";
+      } else {
+        v.pause();
+      }
+    }
+  }, { root: $("feed"), threshold: [0, 0.6] });
+  document.querySelectorAll(".slide").forEach((s) => observer.observe(s));
+}
+let current = null;
+
+function showTap(el, on) { el.querySelector(".tap-hint").classList.toggle("show", on); }
+
+function updateStats() {
+  const vals = [...seen.values()];
+  const rot = vals.filter(Boolean).length;
+  $("stats").textContent = items.length
+    ? `${vals.length} watched · ${rot} brain rot · ${items.filter((i) => i.is_brain_rot).length}/${items.length} in catalog flagged`
+    : "";
+}
+
+function setMuted(m) {
+  muted = m;
+  $("sound").innerHTML = m ? ICON.muted : ICON.sound;
+  $("sound").setAttribute("aria-label", m ? "Unmute" : "Mute");
+  if (current) current.querySelector("video").muted = m;
+}
+
+function openSheet(it) {
+  const c = it.is_brain_rot ? "var(--rot)" : "var(--ok)";
+  const crit = Object.entries(it.criteria).map(([k, n]) => {
+    const col = n >= 7 ? "var(--rot)" : n >= 4 ? "var(--warn)" : "var(--ok)";
+    return `<div class="crit"><span>${esc(CRIT[k] || k)}</span><span class="num">${n}</span><div class="bar"><span style="width:${n * 10}%;background:${col}"></span></div></div>`;
+  }).join("");
+  const s = it.signals;
+  $("sheet").innerHTML = `<div class="grab"></div>
+    <div class="verdict"><div class="gauge" style="--v:${it.score};--c:${c}"><div>${it.score}</div></div>
+      <div><div class="lbl" style="color:${c}">${it.is_brain_rot ? "Brain rot" : "Not brain rot"}</div>
+      <div class="meta">threshold ${it.threshold} · confidence ${Math.round(it.confidence * 100)}% · ${esc(it.model)} (${esc(it.mode)})</div>
+      <div class="meta">classified ahead of time, read from feed.json</div></div></div>
+    <h3>What it is</h3><p>${esc(it.summary)}</p>
+    <h3>Why</h3><p>${esc(it.reasoning)}</p>
+    ${it.tropes.length ? `<h3>Brain rot tropes</h3><div class="chips">${it.tropes.map((t) => `<span class="chip bad">${esc(t)}</span>`).join("")}</div>` : ""}
+    ${it.redeeming.length ? `<h3>Redeeming qualities</h3><div class="chips">${it.redeeming.map((t) => `<span class="chip good">${esc(t)}</span>`).join("")}</div>` : ""}
+    <h3>Criteria (0-10)</h3>${crit}
+    ${s ? `<h3>Measured locally</h3><div class="sigs">
+      <div class="sig"><b>${Math.round(s.duration_s)}s</b>length</div>
+      <div class="sig"><b>${s.cuts_per_minute}</b>cuts / min</div>
+      <div class="sig"><b>${s.mean_motion}</b>motion</div></div>` : ""}`;
+  $("sheet").scrollTop = 0;
+  $("sheet").classList.add("open"); $("scrim").classList.add("open");
+}
+function closeSheet() { $("sheet").classList.remove("open"); $("scrim").classList.remove("open"); }
+
+function scrollBy(dir) {
+  const f = $("feed");
+  f.scrollTo({ top: Math.round(f.scrollTop / f.clientHeight + dir) * f.clientHeight, behavior: "smooth" });
+}
+
+$("feed").addEventListener("click", (e) => {
+  const el = e.target.closest(".slide");
+  if (!el) return;
+  const it = byId(el.dataset.id);
+  if (e.target.closest("[data-why]")) return openSheet(it);
+  if (e.target.closest("[data-allow]")) {
+    allowed.add(it.id); applyGate(el);
+    const v = el.querySelector("video"); v.muted = muted; v.play().catch(() => {});
+    return;
+  }
+  if (e.target.closest("[data-skip]")) return scrollBy(1);
+  if (el.classList.contains("gated")) return;
+  const v = el.querySelector("video");          // tap the video = play / pause
+  if (v.paused) { v.play().catch(() => {}); showTap(el, false); } else { v.pause(); showTap(el, true); }
+});
+document.querySelector(".seg").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-policy]");
+  if (!b || b.dataset.policy === policy) return;
+  policy = b.dataset.policy; store.set("brf.policy", policy); render();
+});
+$("sound").addEventListener("click", () => setMuted(!muted));
+$("scrim").addEventListener("click", closeSheet);
+addEventListener("keydown", (e) => {
+  if (e.key === "Escape") return closeSheet();
+  if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); scrollBy(1); }
+  if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); scrollBy(-1); }
+  if (e.key === "m") setMuted(!muted);
+});
+
+// ---------- adding a video: upload, Gemini classifies it once, it joins the top of the feed ----------
+let uploading = false, tick = null;
+function upcard(html, cls = "") {
+  const c = $("upcard");
+  c.className = "upcard show " + cls;
+  c.innerHTML = html;
+  c.querySelector(".x")?.addEventListener("click", () => { c.className = "upcard"; });
+}
+function upload(file) {
+  if (uploading) return;
+  if (!file || !(file.type.startsWith("video/") || /\.(mp4|mov|webm|mkv|m4v|avi)$/i.test(file.name))) {
+    return upcard(`<div class="head">Not a video<button class="x t" aria-label="Close">×</button></div><div class="msg">Pick an .mp4, .mov or .webm file.</div>`, "err");
+  }
+  uploading = true;
+  const name = esc(file.name), t0 = performance.now();
+  const secs = () => ((performance.now() - t0) / 1000).toFixed(0) + "s";
+  upcard(`<div class="head"><span class="spin"></span><span id="upstep">Uploading</span><span class="t" id="upt">0s</span></div>
+    <div class="file">${name}</div><div class="prog" id="upprog"><span></span></div>`);
+  tick = setInterval(() => { const t = $("upt"); if (t) t.textContent = secs(); }, 250);
+
+  const fd = new FormData();
+  fd.append("file", file);
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/feed/upload");
+  xhr.upload.onprogress = (e) => {
+    if (e.lengthComputable) $("upprog").firstElementChild.style.width = Math.round((e.loaded / e.total) * 100) + "%";
+  };
+  xhr.upload.onload = () => {   // bytes are on the server: now it's Gemini's turn
+    $("upstep").textContent = "Gemini is watching it…";
+    const p = $("upprog"); p.firstElementChild.style.width = ""; p.classList.add("busy");
+  };
+  const finish = () => { uploading = false; clearInterval(tick); };
+  xhr.onerror = () => { finish(); upcard(`<div class="head">Upload failed<button class="x t" aria-label="Close">×</button></div><div class="msg">Couldn't reach the server.</div>`, "err"); };
+  xhr.onload = () => {
+    finish();
+    let d = null; try { d = JSON.parse(xhr.responseText); } catch {}
+    if (xhr.status !== 200 || !d) {
+      const why = (d && d.detail) || xhr.statusText || "Unknown error";
+      return upcard(`<div class="head">Couldn't add ${name}<button class="x t" aria-label="Close">×</button></div><div class="msg">${esc(why)}</div>`, "err");
+    }
+    items = [d, ...items.filter((it) => it.id !== d.id)];
+    const hiddenNow = policy === "hide" && d.is_brain_rot;
+    render();
+    const c = d.is_brain_rot ? "var(--rot)" : "var(--ok)";
+    upcard(`<div class="head"><span style="color:${c}">${d.is_brain_rot ? "Brain rot" : "Not brain rot"} · ${d.score}</span><span class="t">classified in ${secs()}</span><button class="x t" aria-label="Close">×</button></div>
+      <div class="file">${esc(d.id)}</div>
+      <div class="msg">${hiddenNow ? "The Hide filter kept it out of the feed. Switch to Label or Warn to see it." : "Added to the top of the feed. From now on its verdict is read from storage, not re-computed."}</div>`);
+    setTimeout(() => { if (!uploading) $("upcard").className = "upcard"; }, 9000);
+  };
+  xhr.send(fd);
+}
+$("add").addEventListener("click", () => { if (!uploading) $("file").click(); });
+$("file").addEventListener("change", (e) => { upload(e.target.files[0]); e.target.value = ""; });
+let dragDepth = 0;
+addEventListener("dragenter", (e) => { if (e.dataTransfer?.types?.includes("Files")) { dragDepth++; $("drop").classList.add("show"); } });
+addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; $("drop").classList.remove("show"); } });
+addEventListener("dragover", (e) => e.preventDefault());
+addEventListener("drop", (e) => {
+  e.preventDefault(); dragDepth = 0; $("drop").classList.remove("show");
+  if (e.dataTransfer.files.length) upload(e.dataTransfer.files[0]);
+});
+
+setMuted(true);
+fetch("/api/feed").then((r) => r.json()).then((d) => { items = d.items; pending = d.pending; render(); })
+  .catch((e) => { $("feed").innerHTML = `<div class="empty"><div><h2>Couldn't load the feed</h2><p>${esc(e)}</p></div></div>`; });
+</script>
+</body>
+</html>

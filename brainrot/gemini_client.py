@@ -92,6 +92,11 @@ class GeminiBackend:
                     raise RuntimeError(f"Empty response from Gemini (prompt feedback: {resp.prompt_feedback})")
                 return GeminiVerdict.model_validate_json(resp.text)
             except errors.APIError as e:
+                if e.code == 429 and "PerDay" in str(e):
+                    # daily quota: retrying in seconds can't help, so fail fast with a clear message
+                    raise RuntimeError("Gemini daily request quota is used up for this API key and model "
+                                       "(free tier). It resets in about a day; enable billing or switch "
+                                       "GEMINI_MODEL to keep going.") from e
                 if e.code in RETRYABLE_CODES and attempt < retries:
                     logger.warning("Gemini error %s, retrying in %.0fs", e.code, delay)
                     time.sleep(delay)

@@ -108,11 +108,29 @@ async function predict(id, platform, frames) {
   return { prob: data.prob, flagged: data.flagged, reasons: data.reasons || [] };
 }
 
+// send a clip recorded by content.js to the server as a normal file upload
+async function predictClip(id, platform, clipB64, mime) {
+  const bytes = Uint8Array.from(atob(clipB64), (c) => c.charCodeAt(0));
+  const fd = new FormData();
+  fd.append("file", new Blob([bytes], { type: mime || "video/webm" }), "clip.webm");
+  fd.append("video_id", id.slice(3));
+  fd.append("platform", platform);
+  const res = await fetch(CONFIG.API_URL + "/predict_clip", {
+    method: "POST",
+    body: fd,
+    signal: AbortSignal.timeout(CONFIG.API_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`API ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const data = await res.json();
+  return { prob: data.prob, flagged: data.flagged, reasons: data.reasons || [] };
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   (async () => {
     try {
       if (msg.type === "CAPTURE") reply({ ok: true, frame: await capture(sender.tab.windowId, msg.rect, msg.dpr) });
       else if (msg.type === "PREDICT") reply({ ok: true, data: await predict(msg.id, msg.platform || "instagram", msg.frames) });
+      else if (msg.type === "PREDICT_CLIP") reply({ ok: true, data: await predictClip(msg.id, msg.platform || "instagram", msg.clip_b64, msg.mime) });
       else if (msg.type === "RECORD") { await record(msg.id, msg.flagged); reply({ ok: true }); }
       else if (msg.type === "RESET") { await resetToday(); reply({ ok: true }); }
       else reply({ ok: false, error: "unknown message" });

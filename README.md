@@ -56,11 +56,35 @@ Everyone runs the model locally with their own key, because the extension looks 
 
 More detail on how the extension counts and what `/predict` returns is in [`extension-counter/README.md`](extension-counter/README.md).
 
+## Demo feed (pre-classified)
+
+This is how a platform would use the classifier: every video is scored once, ahead of time, and the stored verdict is read while people scroll. There's no waiting and no model call at view time.
+
+1. Put some videos in `samples/`. The folder is gitignored, so the videos stay out of the repo.
+2. Classify them once. Unchanged videos are skipped on later runs, so you only pay for new ones:
+   ```
+   python -m brainrot.cli index samples
+   ```
+3. Start the server (as in step 2 above) and open http://localhost:8000/feed.
+
+Swipe or use the arrow keys to move between videos. Tap a video to pause it, and press `m` or the speaker button to unmute. The toggle at the top switches what the "platform" does with flagged videos:
+
+- **Label**: show every video with its verdict.
+- **Warn**: blur flagged videos behind a "watch anyway" screen.
+- **Hide**: drop flagged videos from the feed.
+
+To show a live classification, press **+** (or drop a video file onto the page). The video uploads, Gemini classifies it once (you'll see "Gemini is watching it…" with a timer), and it's added to the top of the feed with an "added" tag. After that its verdict is stored like every other video's, so it's never classified again.
+
+On the free Gemini tier, each model allows only 20 requests per day, which covers `index` runs and uploads together. Plan the demo around that, or enable billing on the key.
+
+The score button opens the full explanation: the reasoning, tropes, the 7 criteria and the locally measured cuts per minute. Verdicts are stored in `samples/feed.json`. Use `--force` to re-classify everything, and set `BRAINROT_FEED_DIR` to use a different folder.
+
 ## Command line
 
 ```
 pip install -e .
 brainrot classify video.mp4            # one or more files, folders or URLs
 brainrot eval labels.csv               # accuracy against a labelled CSV (source,label[,context])
-brainrot serve                         # web UI and the extension's API on port 8000
+brainrot index samples/                # pre-classify a folder for the demo feed
+brainrot serve                         # web UI, /feed demo and the extension's API on port 8000
 ```

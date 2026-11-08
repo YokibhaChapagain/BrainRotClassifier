@@ -99,3 +99,51 @@ def test_predict_rejects_bad_input(monkeypatch):
 def test_health():
     d = TestClient(server.app).get("/health").json()
     assert d["ok"] is True and "model" in d
+
+
+def test_predict_clip_scores_recorded_webm_and_caches(monkeypatch, hyper_video, tmp_path):
+    import subprocess
+
+    calls = []
+    orig = clf_mod.BrainRotClassifier.__init__
+
+    def init(self, settings=None, backend=None):
+        fb = FakeBackend(80)
+        calls.append(fb)
+        orig(self, settings, fb)
+
+    monkeypatch.setattr(clf_mod.BrainRotClassifier, "__init__", init)
+    monkeypatch.setenv("BRAINROT_MODE", "frames")
+    monkeypatch.setenv("BRAINROT_MAX_FRAMES", "4")
+    # same kind of file MediaRecorder produces: webm, vp8 + opus
+    webm = tmp_path / "clip.webm"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(hyper_video), "-t", "4",
+                    "-c:v", "libvpx", "-b:v", "500k", "-c:a", "libopus", str(webm)], check=True)
+    server._cache.clear()
+    c = TestClient(server.app)
+    form = {"video_id": "7301", "platform": "tiktok"}
+    with open(webm, "rb") as f:
+        r = c.post("/predict_clip", files={"file": ("clip.webm", f, "video/webm")}, data=form)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["flagged"] is True and d["prob"] == 0.8 and d["mode"] == "frames"
+    assert d["signals"]["has_audio"] and d["signals"]["scene_cuts"] > 5
+    parts, _ = calls[0].calls[0]
+    kinds = [p[1] for p in parts if p[0] == "bytes"]
+    assert kinds.count("image/jpeg") == 4 and "audio/mp3" in kinds  # BRAINROT_MAX_FRAMES applies here
+
+    with open(webm, "rb") as f:
+        assert c.post("/predict_clip", files={"file": ("clip.webm", f, "video/webm")}, data=form).json() == d
+    assert len(calls) == 1  # cached by video id
+
+
+def test_predict_clip_rejects_garbage(monkeypatch):
+    _patch(monkeypatch)
+    server._cache.clear()
+    c = TestClient(server.app)
+    r = c.post("/predict_clip", files={"file": ("clip.webm", b"not a video", "video/webm")},
+               data={"video_id": "x", "platform": "tiktok"})
+    assert r.status_code == 502 and "could not read" in r.text
+    r = c.post("/predict_clip", files={"file": ("clip.webm", b"", "video/webm")},
+               data={"video_id": "y", "platform": "tiktok"})
+    assert r.status_code == 400

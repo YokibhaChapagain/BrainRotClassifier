@@ -2,7 +2,8 @@
 
   brainrot classify video.mp4 [more.mp4 | folder/ | https://youtube.com/...]
   brainrot eval labels.csv          # CSV with columns: source,label  (label: brain_rot / not_brain_rot)
-  brainrot serve                    # web UI on http://localhost:8000
+  brainrot index [samples/]         # pre-classify a folder for the demo feed
+  brainrot serve                    # web UI on http://localhost:8000 (demo feed at /feed)
 """
 
 from __future__ import annotations
@@ -136,6 +137,29 @@ def cmd_eval(args: argparse.Namespace) -> int:
     return 0 if n else 1
 
 
+def cmd_index(args: argparse.Namespace) -> int:
+    from . import feed
+    from .classifier import BrainRotClassifier
+
+    folder = Path(args.folder) if args.folder else feed.feed_dir()
+    videos = feed.list_videos(folder)
+    if not videos:
+        print(f"No videos in {folder}/ - put .mp4 files there first.", file=sys.stderr)
+        return 1
+    clf = BrainRotClassifier(_settings(args))
+
+    def show(path, r, err):
+        if err:
+            print(f"XX  {path.name}: {err}")
+        else:
+            print(f"OK  {path.name}: {r.label} {r.brain_rot_score}/100 ({r.elapsed_s}s)")
+
+    print(f"Classifying {len(videos)} videos in {folder}/ (already-classified, unchanged files are skipped)")
+    done, skipped, failed = feed.index_folder(lambda p: clf.classify(p), folder, force=args.force, on_result=show)
+    print(f"\n{done} classified, {skipped} skipped, {failed} failed -> {folder / feed.CATALOG_NAME}")
+    return 1 if failed and not done and not skipped else 0
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
@@ -169,6 +193,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("csv")
     common(p)
     p.set_defaults(func=cmd_eval)
+
+    p = sub.add_parser("index", help="pre-classify a folder of videos for the /feed demo (writes feed.json)")
+    p.add_argument("folder", nargs="?", help="folder of videos (default: BRAINROT_FEED_DIR or samples/)")
+    p.add_argument("--force", action="store_true", help="re-classify videos that already have a verdict")
+    common(p)
+    p.set_defaults(func=cmd_index)
 
     p = sub.add_parser("serve", help="start the web UI")
     p.add_argument("--host", default="127.0.0.1")

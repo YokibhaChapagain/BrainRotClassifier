@@ -104,8 +104,69 @@
     }
   }
 
+  const blobToB64 = (blob) => new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result).split(",")[1]);
+    fr.onerror = () => reject(fr.error);
+    fr.readAsDataURL(blob);
+  });
+
+  // Record what the <video> element is already playing (picture + sound). This makes no extra
+  // requests to Instagram/TikTok: it reuses the bytes the browser downloaded to show you the video.
+  // Returns a Blob, null (not watched long enough), or "unsupported" (fall back to screenshots).
+  async function recordClip(c) {
+    let stream, rec, failed = null;
+    try {
+      stream = c.video.captureStream();
+      const mime = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]
+        .find((m) => MediaRecorder.isTypeSupported(m));
+      rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: CONFIG.CLIP_BITRATE });
+      rec.onerror = (e) => { failed = e.error || e; };
+      rec.start(1000);
+    } catch (e) {
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      console.warn("[brainrot] can't record this video, using screenshots:", e);
+      return "unsupported";
+    }
+    const chunks = [];
+    rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    const stopped = new Promise((r) => { rec.onstop = r; });
+    setNow("recording this reel…");
+
+    // count only seconds actually played on screen; pause the recorder while the video is paused
+    let watched = 0, last = performance.now();
+    while (on && c === cur && !failed && watched < CONFIG.CLIP_SECONDS) {
+      await sleep(250);
+      const now = performance.now();
+      const playing = !c.video.paused && !document.hidden;
+      if (playing) watched += (now - last) / 1000;
+      if (!playing && rec.state === "recording") rec.pause();
+      if (playing && rec.state === "paused") rec.resume();
+      last = now;
+    }
+    if (rec.state !== "inactive") rec.stop();
+    await stopped;
+    stream.getTracks().forEach((t) => t.stop()); // stops our copy only, the video keeps playing
+    if (failed) {
+      console.warn("[brainrot] recording failed, using screenshots:", failed);
+      return c === cur ? "unsupported" : null;
+    }
+    if (!on || watched < CONFIG.CLIP_MIN_SECONDS || !chunks.length) return null;
+    return new Blob(chunks, { type: rec.mimeType || "video/webm" });
+  }
+
+  async function scoreClip(c, clip) {
+    let clip_b64;
+    try { clip_b64 = await blobToB64(clip); } catch (e) { console.warn("[brainrot] clip read failed", e); return; }
+    if (c === cur) setNow("asking the model…");
+    handleAnswer(c, await send({ type: "PREDICT_CLIP", id: c.id, platform, clip_b64, mime: clip.type }));
+  }
+
   async function score(c) {
-    const res = await send({ type: "PREDICT", id: c.id, platform, frames: c.frames.slice() });
+    handleAnswer(c, await send({ type: "PREDICT", id: c.id, platform, frames: c.frames.slice() }));
+  }
+
+  function handleAnswer(c, res) {
     if (!on) return;
     const showing = c === cur; // the model can answer after the user has already swiped on
     if (!res || !res.ok) {
@@ -124,6 +185,14 @@
   }
 
   async function run(c) {
+    if (CONFIG.MODE === "api" && CONFIG.SEND === "clip") {
+      const clip = await recordClip(c);
+      if (clip !== "unsupported") {
+        if (clip) scoreClip(c, clip);
+        return;
+      }
+      // this video can't be recorded (e.g. cross-origin source): screenshots below
+    }
     while (on && c === cur && c.frames.length < CONFIG.MAX_FRAMES) {
       if (!document.hidden) {
         const shot = await grab(c);
