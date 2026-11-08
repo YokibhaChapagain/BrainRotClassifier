@@ -178,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
 
     def common(p: argparse.ArgumentParser) -> None:
         p.add_argument("--mode", choices=["native", "frames"], help="native = send whole video (default); frames = keyframes + audio")
-        p.add_argument("--backend", choices=["nvidia", "gemini"], help="model provider (default from BRAINROT_BACKEND, else nvidia)")
+        p.add_argument("--backend", choices=["nvidia", "gemini"], help="model provider (default from BRAINROT_BACKEND, else gemini)")
         p.add_argument("--model", help="model id (default from NVIDIA_MODEL or GEMINI_MODEL)")
         p.add_argument("--threshold", type=int, help="score >= threshold => brain rot (default 50)")
         p.add_argument("--max-frames", dest="max_frames", type=int, help="keyframes in frames mode (default 16)")

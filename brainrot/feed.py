@@ -186,9 +186,32 @@ def to_item(name: str, entry: dict, meta: dict | None = None) -> dict:
     }
 
 
+LEAD_CLEAN = 2  # the feed opens with this many non brain rot videos, so it starts out looking normal
+TOP_SLOTS = 6   # after those, this many slots alternate brain rot / not brain rot
+
+
+def arrange(items: list[dict], lead: int = LEAD_CLEAN, top: int = TOP_SLOTS) -> list[dict]:
+    """Order the feed so it lures you in. Uploads stay first. Then `lead` non brain rot videos, then
+    `top` slots that alternate, starting with brain rot: the highest-scoring brain rot videos, each
+    followed by the next non brain rot video in name order. If one kind runs out, the other fills
+    the remaining slots. Everything else follows in its original (name) order."""
+    uploads = [it for it in items if it["uploaded"]]
+    rest = [it for it in items if not it["uploaded"]]
+    rot = sorted((it for it in rest if it["is_brain_rot"]), key=lambda it: -it["score"])
+    clean = [it for it in rest if not it["is_brain_rot"]]
+    head: list[dict] = clean[:lead]
+    clean = clean[lead:]
+    while len(head) < lead + top and (rot or clean):
+        pick = rot if ((len(head) - lead) % 2 == 0 and rot) or not clean else clean
+        head.append(pick.pop(0))
+    chosen = {id(it) for it in head}
+    return uploads + head + [it for it in rest if id(it) not in chosen]
+
+
 def feed_items(folder: Path) -> tuple[list[dict], list[str]]:
-    """What the /feed page needs: uploads (newest first), then the rest in name order, plus names
-    still waiting to be indexed."""
+    """What the /feed page needs: uploads (newest first), then two non brain rot videos, then slots
+    alternating the worst brain rot with non brain rot (see `arrange`), then the rest in name order, plus names still
+    waiting to be indexed."""
     catalog = load_catalog(folder)
     ready, pending = [], []
     for path in list_videos(folder):
@@ -199,4 +222,4 @@ def feed_items(folder: Path) -> tuple[list[dict], list[str]]:
             pending.append(path.name)
     ready.sort(key=lambda ne: (-ne[1].get("uploaded_at", 0), ne[0]))
     captions = load_captions(folder)
-    return [to_item(n, e, captions.get(n)) for n, e in ready], pending
+    return arrange([to_item(n, e, captions.get(n)) for n, e in ready]), pending

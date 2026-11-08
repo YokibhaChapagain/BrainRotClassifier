@@ -24,8 +24,8 @@ _load_dotenv()
 
 @dataclass
 class Settings:
-    # Which model provider classifies videos: "nvidia" (NVIDIA API catalog) or "gemini".
-    backend: str = field(default_factory=lambda: os.getenv("BRAINROT_BACKEND", "nvidia").strip().lower())
+    # Which model provider classifies videos: "gemini" (default) or "nvidia" (NVIDIA API catalog).
+    backend: str = field(default_factory=lambda: os.getenv("BRAINROT_BACKEND", "gemini").strip().lower())
     nvidia_api_key: str = field(default_factory=lambda: os.getenv("NVIDIA_API_KEY", ""))
     nvidia_model: str = field(default_factory=lambda: os.getenv("NVIDIA_MODEL", "minimaxai/minimax-m3.1-flash"))
     api_key: str = field(default_factory=lambda: os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY", ""))

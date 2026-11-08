@@ -51,7 +51,7 @@ def _format_signals(s: LocalSignals | None, missing: str = NO_SIGNALS_URL) -> st
 
 
 def make_backend(settings: Settings) -> Backend:
-    """The model provider named by BRAINROT_BACKEND: "nvidia" (default) or "gemini"."""
+    """The model provider named by BRAINROT_BACKEND: "gemini" (default) or "nvidia"."""
     if settings.backend == "nvidia":
         from .nvidia_client import NvidiaBackend
         return NvidiaBackend(settings.nvidia_api_key, settings.nvidia_model, settings.temperature)

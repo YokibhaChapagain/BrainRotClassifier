@@ -55,7 +55,7 @@ def test_index_then_feed(monkeypatch, tmp_path, calm_video, hyper_video, capsys)
     assert "Brain Rot Feed" in c.get("/feed").text
     data = c.get("/api/feed").json()
     assert data["pending"] == []
-    assert [i["id"] for i in data["items"]] == ["a_calm.mp4", "b_hyper.mp4"]
+    assert [i["id"] for i in data["items"]] == ["a_calm.mp4", "b_hyper.mp4"]  # the feed opens with non brain rot
     calm, hyper = data["items"]
     assert calm["is_brain_rot"] is False and calm["score"] == 10
     assert hyper["is_brain_rot"] is True and hyper["score"] == 90 and hyper["tropes"] == ["rapid cuts"]
@@ -195,3 +195,28 @@ def test_feed_uses_captions_when_available(monkeypatch, tmp_path, calm_video, hy
     assert items["a_calm.mp4"]["creator"] is None and items["a_calm.mp4"]["caption"] is None  # falls back to file name
     (d / "captions.json").write_text("not json")
     assert TestClient(server.app).get("/api/feed").status_code == 200
+
+
+def _item(name, score, rot, uploaded=False):
+    return {"id": name, "score": score, "is_brain_rot": rot, "uploaded": uploaded}
+
+
+def test_arrange_opens_clean_then_alternates_worst_brain_rot():
+    items = [_item("a", 10, False), _item("b", 60, True), _item("c", 20, False), _item("d", 90, True),
+             _item("e", 15, False), _item("f", 75, True), _item("g", 55, True), _item("h", 5, False),
+             _item("up", 30, False, uploaded=True)]
+    order = [it["id"] for it in feed.arrange(items)]
+    # upload first, then two clean, then rot/clean alternating with the highest scores first
+    # (clean runs out, so the last slot goes to the remaining brain rot)
+    assert order == ["up", "a", "c", "d", "e", "f", "h", "b", "g"]
+
+
+def test_arrange_fills_from_the_other_kind_when_one_runs_out():
+    items = [_item("a", 10, False), _item("b", 70, True), _item("c", 20, False), _item("d", 30, False)]
+    assert [it["id"] for it in feed.arrange(items)] == ["a", "c", "b", "d"]
+    assert [it["id"] for it in feed.arrange([_item("x", 80, True), _item("y", 90, True)])] == ["y", "x"]
+
+
+def test_arrange_with_too_few_clean_videos_to_lead():
+    items = [_item("a", 10, False), _item("x", 80, True), _item("y", 90, True)]
+    assert [it["id"] for it in feed.arrange(items)] == ["a", "y", "x"]

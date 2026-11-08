@@ -101,6 +101,8 @@ def test_images_only_backend_gets_keyframes_without_audio(calm_video):
 
 
 def test_backend_choice(monkeypatch):
+    monkeypatch.delenv("BRAINROT_BACKEND", raising=False)
+    assert Settings().backend == "gemini"  # the default
     monkeypatch.setenv("BRAINROT_BACKEND", "nvidia")
     monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-x")
     assert isinstance(make_backend(Settings()), NvidiaBackend)
