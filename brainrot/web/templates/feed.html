@@ -23,7 +23,8 @@
          padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
          background: linear-gradient(rgba(0,0,0,.55), transparent); pointer-events: none; }
   .top > * { pointer-events: auto; }
-  .brand { font-weight: 750; letter-spacing: -.01em; font-size: 15px; margin-right: auto; text-shadow: 0 1px 2px #000; }
+  .brand { font-weight: 750; letter-spacing: -.01em; font-size: 15px; margin-right: auto; text-shadow: 0 1px 2px #000;
+           min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .seg { display: flex; background: var(--glass); border: 1px solid var(--line); border-radius: 999px; padding: 2px;
          backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
   .seg button { border: 0; background: none; padding: 5px 11px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--muted); }
@@ -50,6 +51,49 @@
   .rail .circle { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: var(--glass); border: 1px solid var(--line); }
   .rail .score { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--c); }
   .rail svg { width: 22px; height: 22px; }
+
+  /* ---------- presentation polish: the verdict lands, the why button asks to be clicked ---------- */
+  /* badge stamps in each time its video comes on screen */
+  .slide.active .badge { animation: badge-in .6s cubic-bezier(.2, 1.5, .4, 1) both; }
+  @keyframes badge-in { 0% { opacity: 0; transform: translateY(-10px) scale(.55); } 100% { opacity: 1; transform: none; } }
+  .slide.active .badge .dot { animation: dot-ping 1.5s ease-out .6s infinite; }
+  @keyframes dot-ping { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c) 75%, transparent); } 100% { box-shadow: 0 0 0 9px transparent; } }
+  /* brain rot: the badge glows and the screen edge flashes red once */
+  .slide.active .badge.rot { animation: badge-in .6s cubic-bezier(.2, 1.5, .4, 1) both, rot-glow 2.2s ease-in-out .7s infinite; }
+  @keyframes rot-glow { 0%, 100% { box-shadow: 0 0 0 0 transparent; border-color: var(--line); }
+                        50% { box-shadow: 0 0 22px 2px color-mix(in srgb, var(--rot) 55%, transparent); border-color: var(--rot); } }
+  .slide::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0; }
+  .slide.active.rot::after { box-shadow: inset 0 0 90px 8px color-mix(in srgb, var(--rot) 70%, transparent); animation: edge-flash 1.6s ease-out .15s both; }
+  .slide.active.ok::after { box-shadow: inset 0 0 70px 4px color-mix(in srgb, var(--ok) 45%, transparent); animation: edge-flash 1.3s ease-out .15s both; }
+  @keyframes edge-flash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+
+  /* score ring fills up to the score while the number counts up */
+  .rail .ring { position: relative; background: conic-gradient(var(--c) calc(var(--p, 0) * 1%), rgba(255, 255, 255, .13) 0); border: 0; }
+  .rail .ring::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: #121216; }
+  .rail .ring .score { position: relative; }
+
+  /* why button: pulses with an expanding halo and a hint bubble until it's been opened */
+  .rail .why .circle { position: relative; }
+  .rail .why.pulse .circle { border-color: var(--accent); color: var(--accent); animation: why-bob 1.6s ease-in-out infinite; }
+  .rail .why.pulse .circle::after, .rail .why.pulse .circle::before { content: ""; position: absolute; inset: -2px; border-radius: 50%;
+      border: 2px solid var(--accent); animation: why-halo 1.6s ease-out infinite; }
+  .rail .why.pulse .circle::before { animation-delay: .8s; }
+  @keyframes why-halo { 0% { transform: scale(.95); opacity: .9; } 100% { transform: scale(1.75); opacity: 0; } }
+  @keyframes why-bob { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 60%, transparent); } }
+  .rail .why.pulse .lbl { color: var(--accent); }
+  .why-tip { position: absolute; right: 58px; top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 12px; font-weight: 700;
+             padding: 6px 10px; border-radius: 10px; background: var(--accent); color: #0b0b0d; pointer-events: none; opacity: 0; }
+  .why-tip::after { content: ""; position: absolute; right: -5px; top: 50%; margin-top: -5px; border: 5px solid transparent; border-right: 0; border-left-color: var(--accent); }
+  body:not(.why-opened) .slide.active .why.pulse .why-tip { animation: tip-in .4s ease-out 1.2s both, tip-nudge 1.6s ease-in-out 1.6s infinite; }
+  @keyframes tip-in { from { opacity: 0; transform: translate(8px, -50%); } to { opacity: 1; transform: translate(0, -50%); } }
+  @keyframes tip-nudge { 0%, 100% { transform: translate(0, -50%); } 50% { transform: translate(-5px, -50%); } }
+  .rail .why { position: relative; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .slide.active .badge, .slide.active .badge .dot, .slide.active .badge.rot, .slide.active::after,
+    .rail .why.pulse .circle, .rail .why.pulse .circle::after, .rail .why.pulse .circle::before { animation: none !important; }
+    body:not(.why-opened) .slide.active .why.pulse .why-tip { animation: none; opacity: 1; }
+  }
 
   .caption { position: absolute; z-index: 4; inset: auto 70px 0 0; padding: 40px 14px calc(18px + env(safe-area-inset-bottom));
              background: linear-gradient(transparent, rgba(0,0,0,.75)); }
@@ -173,6 +217,7 @@ const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch {
 let items = [], pending = [], policy = store.get("brf.policy", "label"), muted = true;
 const allowed = new Set();   // flagged videos the viewer chose to watch anyway (warn mode)
 const seen = new Map();      // id -> is_brain_rot, for the session counter
+const opened = new Set();    // videos whose "why" panel was opened: their button stops pulsing
 let observer = null;
 
 function badge(it) {
@@ -181,13 +226,13 @@ function badge(it) {
 
 function slide(it) {
   const tropes = it.tropes.slice(0, 3).map(esc).join(" · ");
-  return `<section class="slide" data-id="${esc(it.id)}">
+  return `<section class="slide ${it.is_brain_rot ? "rot" : "ok"}" data-id="${esc(it.id)}">
     <video src="${esc(it.src)}" loop playsinline muted preload="metadata"></video>
     <div class="tap-hint">${ICON.play}</div>
     ${badge(it)}
     <div class="rail">
-      <button data-why aria-label="Why this verdict"><span class="circle" style="--c:${it.is_brain_rot ? "var(--rot)" : "var(--ok)"}"><span class="score">${it.score}</span></span>score</button>
-      <button data-why aria-label="Details"><span class="circle">${ICON.info}</span>why</button>
+      <button data-why aria-label="Why this verdict"><span class="circle ring" style="--c:${it.is_brain_rot ? "var(--rot)" : "var(--ok)"};--p:${it.score}"><span class="score">${it.score}</span></span>score</button>
+      <button data-why class="why ${opened.has(it.id) ? "" : "pulse"}" aria-label="Why Gemini gave this verdict"><span class="why-tip">Why ${it.score}? Tap</span><span class="circle">${ICON.info}</span><span class="lbl">why?</span></button>
     </div>
     <div class="caption"><div class="name">${esc(it.id)}${it.uploaded ? '<span class="new-tag">added</span>' : ""}</div><div class="sum">${esc(it.summary)}</div></div>
     <div class="gate"><div class="card">
@@ -235,6 +280,7 @@ function watch() {
       const v = e.target.querySelector("video");
       if (e.isIntersecting && e.intersectionRatio >= 0.6) {
         current = e.target;
+        activate(e.target);
         v.muted = muted;
         const it = byId(e.target.dataset.id);
         seen.set(it.id, it.is_brain_rot);
@@ -251,6 +297,28 @@ function watch() {
   document.querySelectorAll(".slide").forEach((s) => observer.observe(s));
 }
 let current = null;
+
+// The slide on screen gets .active, which (re)starts its CSS animations; the score counts up 0 -> score.
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function activate(el) {
+  document.querySelectorAll(".slide.active").forEach((s) => { if (s !== el) s.classList.remove("active"); });
+  el.classList.remove("active");
+  void el.offsetWidth; // reflow so the animations replay when you scroll back to a video
+  el.classList.add("active");
+  const ring = el.querySelector(".ring"), num = ring.querySelector(".score");
+  const target = byId(el.dataset.id).score;
+  if (reduceMotion) { ring.style.setProperty("--p", target); num.textContent = target; return; }
+  const t0 = performance.now(), dur = 900;
+  const step = (t) => {
+    if (!el.classList.contains("active")) return;
+    const k = Math.min(1, (t - t0) / dur), eased = 1 - Math.pow(1 - k, 3);
+    const v = Math.round(target * eased);
+    ring.style.setProperty("--p", v);
+    num.textContent = v;
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
 
 function showTap(el, on) { el.querySelector(".tap-hint").classList.toggle("show", on); }
 
@@ -270,6 +338,9 @@ function setMuted(m) {
 }
 
 function openSheet(it) {
+  opened.add(it.id);
+  document.body.classList.add("why-opened"); // the "Tap" hint bubble has done its job
+  document.querySelector(`.slide[data-id="${CSS.escape(it.id)}"] .why`)?.classList.remove("pulse");
   const c = it.is_brain_rot ? "var(--rot)" : "var(--ok)";
   const crit = Object.entries(it.criteria).map(([k, n]) => {
     const col = n >= 7 ? "var(--rot)" : n >= 4 ? "var(--warn)" : "var(--ok)";
