@@ -1,0 +1,21 @@
+# On the Vultr VM:  git clone ... && cd brainrot-classifier && mkdir -p artifacts
+#                   docker compose -f deploy/docker-compose.yml up -d --build
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: api/Dockerfile
+      args:
+        WITH_ML: "1"   # CLIP needs sentence-transformers; use 0 + USE_CLIP=0 for a tiny motion-only image
+    env_file: ../.env
+    restart: unless-stopped
+  caddy:
+    image: caddy:2
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+    depends_on: [api]
+    restart: unless-stopped
+volumes:
+  caddy_data:

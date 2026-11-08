@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BrainRot Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f4f2; --surface-1: #fcfcfb; --border: #e3e2de;
+    --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #7a7974;
+    --grid: #ecebe7;
+    --normal: #2a78d6;  /* categorical slot 1 */
+    --rot: #eb6834;     /* categorical slot 2 */
+    --seq-0: #f1f5fb; --seq-1: #b7d3f6; --seq-2: #6da7ec; --seq-3: #2a78d6; --seq-4: #184f95;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-0: #111110; --surface-1: #1a1a19; --border: #2c2c2a;
+      --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86; --grid: #262624;
+      --normal: #3987e5; --rot: #d95926;
+      --seq-0: #1f2530; --seq-1: #184f95; --seq-2: #256abf; --seq-3: #3987e5; --seq-4: #86b6ef;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #111110; --surface-1: #1a1a19; --border: #2c2c2a;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86; --grid: #262624;
+    --normal: #3987e5; --rot: #d95926;
+    --seq-0: #1f2530; --seq-1: #184f95; --seq-2: #256abf; --seq-3: #3987e5; --seq-4: #86b6ef;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface-0); color: var(--text-primary);
+         font: 14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+  h1 { font-size: 22px; margin: 0; }
+  h2 { font-size: 14px; margin: 0 0 2px; }
+  .sub { color: var(--text-secondary); font-size: 12px; margin: 0 0 12px; }
+  .filters { display: flex; gap: 8px; }
+  select, button { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border);
+                   background: var(--surface-1); color: var(--text-primary); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 20px 0; }
+  .tile, .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .tile .v { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tile .k { color: var(--text-secondary); font-size: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; }
+  .card.wide { grid-column: 1 / -1; }
+  .chart { position: relative; height: 240px; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .heat { display: grid; grid-template-columns: 30px repeat(24, minmax(0, 1fr)); gap: 2px; font-size: 10px; color: var(--text-muted); }
+  .heat .c { height: 18px; border-radius: 3px; background: var(--seq-0); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-secondary); font-weight: 500; }
+  .empty { color: var(--text-muted); padding: 30px 0; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>🧠 Your Brain Rot Report</h1>
+      <p class="sub" id="who"></p>
+    </div>
+    <div class="filters">
+      <select id="days" aria-label="Time range">
+        <option value="1">Today</option><option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option>
+      </select>
+      <select id="bucket" aria-label="Granularity"><option value="hour">Hourly</option><option value="day">Daily</option></select>
+    </div>
+  </header>
+
+  <section class="tiles">
+    <div class="tile"><div class="v" id="t-share">–</div><div class="k">of your feed is brain rot</div></div>
+    <div class="tile"><div class="v" id="t-min">–</div><div class="k">minutes spent on brain rot</div></div>
+    <div class="tile"><div class="v" id="t-time">–</div><div class="k">of watch time was brain rot</div></div>
+    <div class="tile"><div class="v" id="t-views">–</div><div class="k">reels watched</div></div>
+    <div class="tile"><div class="v" id="t-streak">–</div><div class="k">longest brain rot streak (reels)</div></div>
+    <div class="tile"><div class="v" id="t-skip">–</div><div class="k">skip rate</div></div>
+  </section>
+
+  <section class="grid">
+    <div class="card wide">
+      <h2>Exposure timeline</h2><p class="sub">Reels watched, brain rot vs normal</p>
+      <div class="legend"><span><i style="background:var(--rot)"></i>Brain rot</span><span><i style="background:var(--normal)"></i>Normal</span></div>
+      <div class="chart"><canvas id="c-timeline"></canvas></div>
+    </div>
+    <div class="card wide">
+      <h2>Time spent</h2><p class="sub">Minutes watching, brain rot vs normal</p>
+      <div class="legend"><span><i style="background:var(--rot)"></i>Brain rot</span><span><i style="background:var(--normal)"></i>Normal</span></div>
+      <div class="chart"><canvas id="c-minutes"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>When does the rot hit?</h2><p class="sub">Share of reels flagged, by weekday × hour (last 30 days)</p>
+      <div class="heat" id="heat"></div>
+    </div>
+    <div class="card">
+      <h2>Does brain rot get more engagement?</h2><p class="sub">Per-view rates across the labelled TikTok dataset</p>
+      <div class="legend"><span><i style="background:var(--rot)"></i>Brain rot</span><span><i style="background:var(--normal)"></i>Normal</span></div>
+      <div class="chart"><canvas id="c-eng"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Brain rot over the years</h2><p class="sub">Share of dataset videos labelled brain rot, by year posted</p>
+      <div class="chart"><canvas id="c-trend"></canvas></div>
+    </div>
+    <div class="card wide">
+      <h2>Recent scrolling sessions</h2><p class="sub">A session ends after 10 minutes without reels</p>
+      <div id="sessions"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const API = location.origin;
+const params = new URLSearchParams(location.search);
+const user = params.get("user") || "anon";
+document.getElementById("who").textContent = `user ${user.slice(0, 8)} · data from Tiger Data`;
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const pct = (x) => `${Math.round((x || 0) * 100)}%`;
+const charts = {};
+
+function baseOptions(stacked, yFmt = (v) => v, category = false) {
+  return {
+    responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${yFmt(c.parsed.y)}` } } },
+    scales: {
+      x: { stacked, grid: { display: false }, ticks: category ? { color: css("--text-muted"), autoSkip: false, maxRotation: 0 }
+                                                 : { color: css("--text-muted"), maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } },
+      y: { stacked, beginAtZero: true, grid: { color: css("--grid") }, border: { display: false },
+           ticks: { color: css("--text-muted"), callback: yFmt } },
+    },
+  };
+}
+function bar(label, data, color) {
+  return { label, data, backgroundColor: css(color), borderColor: css("--surface-1"), borderWidth: data.length > 60 ? 1 : 2,
+           borderRadius: 4, borderSkipped: "start", maxBarThickness: 28 };
+}
+function draw(id, cfg) { charts[id]?.destroy(); charts[id] = new Chart(document.getElementById(id), cfg); }
+async function get(path) { const r = await fetch(API + path); return r.ok ? r.json() : null; }
+function fmtBucket(iso, bucket) {
+  const d = new Date(iso);
+  return bucket === "day" ? d.toLocaleDateString([], { month: "short", day: "numeric" })
+                          : d.toLocaleString([], { weekday: "short", hour: "numeric" });
+}
+
+async function load() {
+  const days = document.getElementById("days").value, bucket = document.getElementById("bucket").value;
+  const q = `user_id=${encodeURIComponent(user)}&days=${days}`;
+  const [s, tl, hm, ses, eng, tr] = await Promise.all([
+    get(`/stats/summary?${q}`), get(`/stats/timeline?${q}&bucket=${bucket}`), get(`/stats/heatmap?user_id=${encodeURIComponent(user)}&days=30`),
+    get(`/stats/sessions?${q}`), get(`/stats/engagement`), get(`/stats/trend`)]);
+
+  if (s) {
+    document.getElementById("t-share").textContent = pct(s.rot_share);
+    document.getElementById("t-min").textContent = Math.round(s.rot_watch_min);
+    document.getElementById("t-time").textContent = pct(s.rot_time_share);
+    document.getElementById("t-views").textContent = s.views;
+    document.getElementById("t-streak").textContent = s.longest_rot_streak;
+    document.getElementById("t-skip").textContent = pct(s.skip_rate);
+  }
+
+  const labels = (tl || []).map((r) => fmtBucket(r.bucket, bucket));
+  draw("c-timeline", { type: "bar", data: { labels, datasets: [
+    bar("Brain rot", tl.map((r) => r.rot_views), "--rot"), bar("Normal", tl.map((r) => r.views - r.rot_views), "--normal")] },
+    options: baseOptions(true) });
+  draw("c-minutes", { type: "bar", data: { labels, datasets: [
+    bar("Brain rot", tl.map((r) => +r.rot_watch_min.toFixed(1)), "--rot"),
+    bar("Normal", tl.map((r) => +(r.watch_min - r.rot_watch_min).toFixed(1)), "--normal")] },
+    options: baseOptions(true, (v) => `${v} min`) });
+
+  // heatmap (sequential single hue)
+  const heat = document.getElementById("heat"); heat.innerHTML = "<span></span>" +
+    Array.from({ length: 24 }, (_, h) => `<span>${h % 6 === 0 ? h : ""}</span>`).join("");
+  const cell = Object.fromEntries((hm || []).map((r) => [`${r.dow}-${r.hour}`, r]));
+  const steps = ["--seq-0", "--seq-1", "--seq-2", "--seq-3", "--seq-4"];
+  ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].forEach((d, i) => {
+    heat.insertAdjacentHTML("beforeend", `<span>${d}</span>`);
+    for (let h = 0; h < 24; h++) {
+      const r = cell[`${i + 1}-${h}`];
+      const step = r && r.views ? steps[Math.min(4, 1 + Math.floor(r.rot_share * 4))] : "--seq-0";
+      const tip = r ? `${d} ${h}:00 — ${pct(r.rot_share)} brain rot of ${r.views} reels` : `${d} ${h}:00 — no reels`;
+      heat.insertAdjacentHTML("beforeend", `<div class="c" title="${tip}" style="background:var(${step})"></div>`);
+    }
+  });
+
+  const e = Object.fromEntries((eng || []).map((r) => [r.brainrot ? "rot" : "normal", r]));
+  const metrics = [["Likes", "like_rate"], ["Comments", "comment_rate"], ["Shares", "share_rate"]];
+  draw("c-eng", { type: "bar", data: { labels: metrics.map((m) => m[0]), datasets: [
+    bar("Brain rot", metrics.map((m) => +((e.rot?.[m[1]] || 0) * 100).toFixed(2)), "--rot"),
+    bar("Normal", metrics.map((m) => +((e.normal?.[m[1]] || 0) * 100).toFixed(2)), "--normal")] },
+    options: baseOptions(false, (v) => `${v}%`, true) });
+
+  draw("c-trend", { type: "line", data: { labels: (tr || []).map((r) => r.year), datasets: [{
+    label: "Brain rot share", data: (tr || []).map((r) => +(r.rot_share * 100).toFixed(1)),
+    borderColor: css("--rot"), backgroundColor: css("--rot"), borderWidth: 2, pointRadius: 4,
+    pointBorderColor: css("--surface-1"), pointBorderWidth: 2, tension: 0.25 }] },
+    options: baseOptions(false, (v) => `${v}%`) });
+
+  document.getElementById("sessions").innerHTML = ses && ses.length
+    ? `<table><tr><th>Started</th><th>Minutes</th><th>Reels</th><th>Brain rot</th></tr>${ses.map((r) =>
+        `<tr><td>${new Date(r.start).toLocaleString()}</td><td>${r.minutes.toFixed(1)}</td><td>${r.views}</td><td>${pct(r.rot_views / r.views)}</td></tr>`).join("")}</table>`
+    : `<div class="empty">No sessions yet — go scroll some reels with the extension on.</div>`;
+}
+
+document.getElementById("days").onchange = load;
+document.getElementById("bucket").onchange = load;
+load();
+</script>
+</body>
+</html>

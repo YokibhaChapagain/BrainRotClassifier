@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+data/
+artifacts/*
+!artifacts/.gitkeep
+mlruns/
+*.mp4
+*.wav
+.ipynb_checkpoints/
+.DS_Store
+.pytest_cache/
+.ruff_cache/

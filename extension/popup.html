@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { width: 280px; margin: 0; padding: 14px; font: 13px system-ui, sans-serif; background: #0c0c14; color: #fff; }
+    h1 { font-size: 15px; margin: 0 0 10px; }
+    .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #ffffff1a; }
+    .row b { font-variant-numeric: tabular-nums; }
+    button { margin-top: 12px; width: 100%; padding: 8px; border: 0; border-radius: 8px; background: #eb6834;
+             color: #fff; font-weight: 700; cursor: pointer; }
+    .muted { opacity: .6; font-size: 11px; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <h1>🧠 Today's brain rot</h1>
+  <div class="row"><span>Feed that's brain rot</span><b id="share">–</b></div>
+  <div class="row"><span>Minutes on brain rot</span><b id="min">–</b></div>
+  <div class="row"><span>Reels watched</span><b id="views">–</b></div>
+  <button id="open">Open full dashboard</button>
+  <div class="muted" id="note"></div>
+  <script src="config.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

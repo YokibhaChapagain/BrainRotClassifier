@@ -1,0 +1,8 @@
+# Heavy deps for the pipeline (Databricks cluster / GPU box) and a CLIP-enabled API image
+-r requirements.txt
+torch>=2.2
+sentence-transformers>=2.7      # CLIP (clip-ViT-B-32)
+openai-whisper>=20231117        # fills missing transcripts for the TEACHER only
+opencv-python-headless>=4.9
+huggingface_hub>=0.23
+mlflow>=2.12

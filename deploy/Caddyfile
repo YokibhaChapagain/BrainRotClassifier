@@ -1,0 +1,5 @@
+# GoDaddy DNS: A record  api.<your-domain>  ->  <Vultr VM public IP>
+# Caddy then gets a Let's Encrypt cert automatically.
+api.brainrotmeter.example {
+    reverse_proxy api:8000
+}
