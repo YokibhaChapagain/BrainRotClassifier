@@ -1,0 +1,15 @@
+# Runtime dependencies (mirrors [project].dependencies in pyproject.toml)
+google-genai>=1.0
+opencv-python-headless>=4.8
+numpy
+pydantic>=2
+fastapi
+uvicorn
+python-multipart
+
+# Optional: analyse TikTok/Instagram/other URLs, or YouTube with --download
+yt-dlp
+
+# Dev / tests
+pytest
+httpx  # needed by fastapi.testclient in tests
