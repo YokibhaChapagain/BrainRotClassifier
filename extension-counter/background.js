@@ -101,8 +101,9 @@ async function predict(id, platform, frames) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ video_id: id.slice(3), platform, frames_b64: frames, cuts_per_sec: null }),
+    signal: AbortSignal.timeout(CONFIG.API_TIMEOUT_MS),
   });
-  if (!res.ok) throw new Error(`API ${res.status}`);
+  if (!res.ok) throw new Error(`API ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const data = await res.json();
   return { prob: data.prob, flagged: data.flagged, reasons: data.reasons || [] };
 }

@@ -106,13 +106,21 @@
 
   async function score(c) {
     const res = await send({ type: "PREDICT", id: c.id, platform, frames: c.frames.slice() });
-    if (c !== cur || !on) return;
-    if (!res || !res.ok) { setNow("model offline, not counted"); return; }
+    if (!on) return;
+    const showing = c === cur; // the model can answer after the user has already swiped on
+    if (!res || !res.ok) {
+      const err = (res && res.error) || "";
+      console.warn("[brainrot] predict failed:", err);
+      const offline = !res || /failed to fetch|timeout|aborted/i.test(err);
+      if (showing) setNow(offline ? "model offline, not counted" : "model error, not counted");
+      return;
+    }
     const { prob, flagged } = res.data;
-    const pct = Math.round(prob * 100);
-    setNow(flagged ? `this reel: ${pct}% · brain rot` : `this reel: ${pct}%`, flagged);
     // same id twice just overwrites, so a reel is only counted once
     send({ type: "RECORD", id: c.id, flagged });
+    if (!showing) return;
+    const pct = Math.round(prob * 100);
+    setNow(flagged ? `this reel: ${pct}% · brain rot` : `this reel: ${pct}%`, flagged);
   }
 
   async function run(c) {
@@ -122,7 +130,13 @@
         if (c !== cur) return;
         if (shot && shot.ok) {
           c.frames.push(shot.frame);
-          if (c.frames.length === CONFIG.EARLY_FRAMES || c.frames.length === CONFIG.MAX_FRAMES) score(c);
+          const n = c.frames.length;
+          // the model costs a gemini call, so it's asked once per video
+          if (CONFIG.MODE === "demo" && n === CONFIG.EARLY_FRAMES) score(c);
+          if (n === CONFIG.MAX_FRAMES) {
+            if (CONFIG.MODE !== "demo") setNow("asking the model…");
+            score(c);
+          }
         }
       }
       await sleep(CONFIG.FRAME_INTERVAL_MS);

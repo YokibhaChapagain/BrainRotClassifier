@@ -18,7 +18,11 @@ async function showMode() {
   }
   try {
     const res = await fetch(CONFIG.API_URL + "/health");
-    $("mode").textContent = res.ok ? "Model API online." : `Model API error ${res.status}.`;
+    if (!res.ok) { $("mode").textContent = `Model API error ${res.status}.`; return; }
+    const h = await res.json();
+    $("mode").textContent = h.has_api_key === false
+      ? "Model API online, but GEMINI_API_KEY is not set on the server."
+      : `Model online${h.model ? " (" + h.model + ")" : ""}.`;
   } catch (e) {
     $("mode").textContent = "Model API offline (" + CONFIG.API_URL + ").";
   }
