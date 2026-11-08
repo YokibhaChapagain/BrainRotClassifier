@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "brainrot-web",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["-m", "uvicorn", "brainrot.web.server:app", "--port", "8000"],
+      "port": 8000
+    }
+  ]
+}

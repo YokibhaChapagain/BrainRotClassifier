@@ -62,7 +62,8 @@ Open http://localhost:8000/feed.
     - **Warn:** blur flagged videos behind a "Flagged as brain rot" screen with Skip and Watch anyway buttons.
     - **Hide:** remove flagged videos from the feed. The end card says how many were filtered out.
 - **Add a video live:** press **+** or drop a video file onto the page. It uploads, Gemini classifies it ("Gemini is watching it…" with a timer), and it's added to the top of the feed with an "added" tag. From then on its verdict is stored like every other video's.
-- **Counter:** the bottom bar shows how many videos you've watched and how many of them were brain rot.
+- **Brain damage meter:** the brain at the bottom goes from pink to grey as you watch brain rot. Scrolling onto a brain rot video costs `score × 0.05` points once. After that, every second you keep watching it costs more, and twice as much after 10 seconds. Watching anything else slowly heals you, and so does time away (2 points a minute). It goes through Fresh, Foggy, Cooked, Fried and Gone. Next to it are the counts for this session (videos scrolled and brain rot) and for all time.
+- **Session receipt:** tap the meter, press `r`, or use the button on the end card to see what this session cost you: videos scrolled, the brain rot share, watch time, scene cuts sat through, things learned, the worst offender, and the start, peak and current damage, plus all-time totals. The session is saved in the browser, so a reload keeps it. It ends after 30 minutes without watching or when you press **End session**, and the next time you open the feed you get the last session's receipt.
 
 ## Technical details
 

@@ -93,8 +93,66 @@
   .tap-hint.show { opacity: 1; }
   .tap-hint svg { width: 64px; height: 64px; opacity: .85; filter: drop-shadow(0 2px 6px #000); }
 
-  .stats { position: absolute; z-index: 20; left: 50%; transform: translateX(-50%); bottom: calc(6px + env(safe-area-inset-bottom));
-           font-size: 11px; color: var(--muted); background: var(--glass); padding: 3px 10px; border-radius: 999px; white-space: nowrap; pointer-events: none; }
+  /* ---------- brain damage meter (bottom of the screen) ---------- */
+  .meter { position: absolute; z-index: 20; left: 50%; transform: translateX(-50%); bottom: calc(6px + env(safe-area-inset-bottom));
+           display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 6px; border-radius: 999px; white-space: nowrap;
+           background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+           --brain: #ff8fb8; --hp: 100; }
+  .meter .brain { width: 30px; height: 26px; flex: none; display: block; }
+  .meter .brain svg { width: 100%; height: 100%; overflow: visible; }
+  .meter .lobe { fill: var(--brain); stroke: color-mix(in srgb, var(--brain) 60%, #000); stroke-width: 1.2; transition: fill .4s; }
+  .meter .fold { fill: none; stroke: rgba(0, 0, 0, .35); stroke-width: 1.2; stroke-linecap: round; }
+  .meter .crack { fill: none; stroke: #111; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transition: opacity .4s; }
+  .meter[data-tier="3"] .crack.c1, .meter[data-tier="4"] .crack { opacity: .9; }
+  .meter .m-main { display: flex; flex-direction: column; gap: 3px; min-width: 64px; text-align: left; }
+  .meter .m-state { font-size: 12px; font-weight: 800; line-height: 1; color: var(--brain); transition: color .4s; }
+  .meter .m-bar { height: 4px; width: 64px; border-radius: 2px; background: var(--track); overflow: hidden; }
+  .meter .m-bar > span { display: block; height: 100%; width: calc(var(--hp) * 1%); background: var(--brain); transition: width .3s, background .4s; }
+  .meter .m-count { font-size: 11px; color: var(--muted); line-height: 1.25; text-align: left; font-variant-numeric: tabular-nums; }
+  .meter .m-count b { color: var(--ink); font-weight: 700; }
+  .meter .m-count .rotn { color: var(--rot); }
+  .meter.hit { animation: meter-hit .45s ease-out; }
+  .meter[data-tier="4"] .brain { animation: brain-twitch 2.4s steps(1) infinite; }
+  @keyframes meter-hit { 0%, 100% { transform: translateX(-50%); } 20% { transform: translateX(calc(-50% - 5px)) rotate(-2deg); }
+      40% { transform: translateX(calc(-50% + 5px)) rotate(2deg); } 60% { transform: translateX(calc(-50% - 3px)); } 80% { transform: translateX(calc(-50% + 2px)); } }
+  @keyframes brain-twitch { 0%, 88%, 100% { transform: none; } 90% { transform: translate(1px, -1px) rotate(4deg); } 94% { transform: translate(-1px, 0) rotate(-3deg); } }
+  .ouch { position: absolute; z-index: 21; left: 50%; bottom: calc(44px + env(safe-area-inset-bottom)); pointer-events: none;
+          font-weight: 900; font-size: 15px; color: var(--rot); text-shadow: 0 1px 3px #000; white-space: nowrap; opacity: 0; transform: translateX(-50%); }
+  .ouch.show { animation: ouch 1.3s ease-out both; }
+  @keyframes ouch { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.8); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.1); }
+      70% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -26px) scale(1); } }
+  @media (prefers-reduced-motion: reduce) { .meter.hit, .meter .brain, .ouch.show { animation: none !important; } .ouch.show { opacity: 1; } }
+
+  /* ---------- session receipt ---------- */
+  .receipt { position: absolute; z-index: 32; left: 50%; top: 50%; width: min(330px, calc(100% - 32px)); max-height: calc(100% - 40px);
+             display: none; flex-direction: column; transform: translate(-50%, -50%); filter: drop-shadow(0 14px 40px rgba(0,0,0,.6)); }
+  .receipt.open { display: flex; animation: print .45s cubic-bezier(.2, .8, .3, 1); }
+  @keyframes print { from { opacity: 0; transform: translate(-50%, -42%); } to { opacity: 1; transform: translate(-50%, -50%); } }
+  .receipt .paper { overflow-y: auto; background: #f6f3ea; color: #1b1b1b; padding: 18px 18px 10px;
+                    font: 12.5px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace; border-radius: 4px 4px 0 0; }
+  .receipt .tear { height: 10px; flex: none; background: #f6f3ea;
+                   -webkit-mask: conic-gradient(from 135deg at top, #000 90deg, #0000 0) top / 14px 100%;
+                           mask: conic-gradient(from 135deg at top, #000 90deg, #0000 0) top / 14px 100%; }
+  .receipt .c { text-align: center; }
+  .receipt .title { font-weight: 800; font-size: 15px; letter-spacing: .12em; }
+  .receipt .sub { color: #555; font-size: 11.5px; }
+  .receipt hr { border: 0; border-top: 1.5px dashed #9a968c; margin: 10px 0; }
+  .receipt .ln { display: flex; justify-content: space-between; gap: 12px; }
+  .receipt .ln span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .receipt .ln.ind { padding-left: 12px; color: #555; }
+  .receipt .ln.big { font-weight: 800; font-size: 14px; }
+  .receipt .ln.bad span:last-child { color: #c4123f; font-weight: 700; }
+  .receipt h4 { margin: 0 0 2px; font-size: 11.5px; letter-spacing: .1em; }
+  .receipt .dmgbar { height: 10px; border: 1.5px solid #1b1b1b; margin: 6px 0 2px; position: relative; }
+  .receipt .dmgbar > span { position: absolute; inset: 0 auto 0 0; background: repeating-linear-gradient(45deg, #1b1b1b 0 3px, transparent 3px 6px); }
+  .receipt .dmgbar > i { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #c4123f; }
+  .receipt .fine { margin-top: 8px; text-align: center; font-size: 11px; color: #555; letter-spacing: .04em; }
+  .receipt .barcode { height: 34px; margin: 10px 18px 4px;
+                      background: repeating-linear-gradient(90deg, #1b1b1b 0 2px, transparent 2px 4px, #1b1b1b 4px 5px, transparent 5px 8px, #1b1b1b 8px 11px, transparent 11px 12px); }
+  .receipt .acts { display: flex; gap: 8px; padding: 12px 0 4px; font-family: system-ui, -apple-system, sans-serif; }
+  .receipt .acts button { flex: 1; padding: 10px; border-radius: 8px; border: 1.5px solid #1b1b1b; background: transparent; color: #1b1b1b; font-weight: 700; font-size: 13px; }
+  .receipt .acts button.primary { background: #1b1b1b; color: #f6f3ea; }
+  .end button { margin-top: 14px; padding: 9px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--glass); font-weight: 650; font-size: 14px; }
 
   /* explanation sheet */
   .scrim { position: absolute; z-index: 30; inset: 0; background: rgba(0,0,0,.45); opacity: 0; pointer-events: none; transition: opacity .2s; }
@@ -169,9 +227,21 @@
   <div class="drop" id="drop"><div><b>Drop a video to add it</b>Gemini classifies it once, then it joins the feed</div></div>
   <div class="upcard" id="upcard" role="status" aria-live="polite"></div>
   <div class="feed" id="feed"></div>
-  <div class="stats" id="stats"></div>
+  <button class="meter" id="meter" aria-label="Brain damage meter: open your session receipt" title="Your brain this session. Tap for the receipt (r)">
+    <span class="brain"><svg viewBox="0 0 32 28" aria-hidden="true">
+      <path class="lobe" d="M15.2 3.2C13.4 1.4 9.8 1.6 8.4 4 5.3 3.8 3.2 6.4 3.9 9.2 1.6 10.6 1.4 14.2 3.3 16 2.4 18.9 4.4 21.8 7.3 21.9 8 24.8 11.6 26.2 14 24.6l1.2.6Z"/>
+      <path class="lobe" d="M16.8 3.2C18.6 1.4 22.2 1.6 23.6 4c3.1-.2 5.2 2.4 4.5 5.2 2.3 1.4 2.5 5 .6 6.8.9 2.9-1.1 5.8-4 5.9-.7 2.9-4.3 4.3-6.7 2.7l-1.2.6Z"/>
+      <path class="fold" d="M9 8.5c1.5-.4 3 .4 3.4 1.8M6 14c1.8-.6 3.6.2 4.2 1.8M11 19.5c.4-1.6 2-2.4 3.4-2M23 8.5c-1.5-.4-3 .4-3.4 1.8M26 14c-1.8-.6-3.6.2-4.2 1.8M21 19.5c-.4-1.6-2-2.4-3.4-2"/>
+      <path class="crack c1" d="M10 3.5 11.5 7 9.5 9.5 12 12.5"/>
+      <path class="crack c2" d="M24 15 21.5 17.5 23.5 19.5 21 23"/>
+    </svg></span>
+    <span class="m-main"><span class="m-state" id="m-state">Fresh</span><span class="m-bar"><span></span></span></span>
+    <span class="m-count" id="m-count"></span>
+  </button>
+  <div class="ouch" id="ouch" aria-hidden="true"></div>
   <div class="scrim" id="scrim"></div>
   <div class="sheet" id="sheet" role="dialog" aria-label="Why this verdict"></div>
+  <div class="receipt" id="receipt" role="dialog" aria-label="Session receipt"></div>
 </div>
 
 <script>
@@ -193,7 +263,6 @@ const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch {
 
 let items = [], pending = [], policy = store.get("brf.policy", "label"), muted = true;
 const allowed = new Set();   // flagged videos the viewer chose to watch anyway (warn mode)
-const seen = new Map();      // id -> is_brain_rot, for the session counter
 const opened = new Set();    // videos whose "why" panel was opened: their button stops pulsing
 let observer = null;
 
@@ -234,18 +303,19 @@ function render() {
     feed.innerHTML = `<div class="empty"><div><h2>No classified videos yet</h2>
       <p>${pending.length ? `${pending.length} video(s) are waiting to be classified.` : "Put some .mp4 files in <code>samples/</code>."}</p>
       <p>Then run <code>brainrot index samples/</code> and reload, or press + to add one now.</p></div></div>`;
-    updateStats();
+    updateMeter();
     return;
   }
   const visible = policy === "hide" ? items.filter((it) => !it.is_brain_rot) : items;
   const hidden = items.length - visible.length;
   feed.innerHTML = visible.map(slide).join("") +
     `<div class="end"><div><b>You're all caught up</b>${hidden ? `${hidden} brain rot video${hidden > 1 ? "s were" : " was"} filtered out of this feed.` : "Every video in the folder has been shown."}
-     ${pending.length ? `<br>${pending.length} new video(s) not classified yet: run <code>brainrot index</code>.` : ""}</div></div>`;
+     ${pending.length ? `<br>${pending.length} new video(s) not classified yet: run <code>brainrot index</code>.` : ""}
+     <br><button data-receipt>See what it cost you</button></div></div>`;
   feed.scrollTop = 0;
   feed.querySelectorAll(".slide").forEach(applyGate);
   watch();
-  updateStats();
+  updateMeter();
 }
 
 const byId = (id) => items.find((it) => it.id === id);
@@ -265,9 +335,7 @@ function watch() {
         current = e.target;
         activate(e.target);
         v.muted = muted;
-        const it = byId(e.target.dataset.id);
-        seen.set(it.id, it.is_brain_rot);
-        updateStats();
+        recordView(byId(e.target.dataset.id), e.target.classList.contains("gated"));
         if (!e.target.classList.contains("gated")) v.play().catch(() => showTap(e.target, true));
         // warm up the next video so swiping feels instant
         const nextV = e.target.nextElementSibling?.querySelector?.("video");
@@ -306,13 +374,202 @@ function activate(el) {
 
 function showTap(el, on) { el.querySelector(".tap-hint").classList.toggle("show", on); }
 
-function updateStats() {
-  const vals = [...seen.values()];
-  const rot = vals.filter(Boolean).length;
-  $("stats").textContent = items.length
-    ? `${vals.length} watched · ${rot} brain rot`
-    : "";
+// ---------- scroll session, brain damage and the receipt ----------
+// The session lives in localStorage, so a reload or a closed tab picks up where you left off. A session ends
+// after SESSION_GAP with nothing watched, or when you end it from the receipt. Ended sessions are folded
+// into all-time totals, and the last one is kept so it can be shown when you come back.
+const SESSION_GAP = 30 * 60e3;
+const HEAL_PER_MIN = 2;          // the brain recovers this many points per minute away from the feed
+const K_SESSION = "brf.session", K_LAST = "brf.lastSession", K_LIFE = "brf.lifetime";
+const readJSON = (k) => { try { return JSON.parse(store.get(k, "null")); } catch { return null; } };
+const writeJSON = (k, v) => store.set(k, JSON.stringify(v));
+const newSession = (damage = 0) => { const now = Date.now(); return { startedAt: now, lastActiveAt: now, startDamage: damage, damage, peak: damage, views: {} }; };
+let life = readJSON(K_LIFE) || { sessions: 0, videos: 0, rot: 0, watchMs: 0, rotMs: 0, since: Date.now() };
+let lastSession = readJSON(K_LAST);
+let session = readJSON(K_SESSION) || newSession();
+let saveAt = 0;
+function saveSession(force) {
+  if (!force && performance.now() - saveAt < 1000) return;
+  saveAt = performance.now();
+  writeJSON(K_SESSION, session);
 }
+
+const TIERS = [[0, "Fresh"], [20, "Foggy"], [45, "Cooked"], [70, "Fried"], [90, "Gone"]];
+const tierOf = (d) => TIERS.reduce((t, [min], i) => (d >= min ? i : t), 0);
+const tierName = (d) => TIERS[tierOf(d)][1];
+
+function totals(s) {
+  const v = Object.values(s.views), rot = v.filter((x) => x.rot);
+  const sum = (a, f) => a.reduce((n, x) => n + f(x), 0);
+  return {
+    videos: v.length, rot: rot.length, watchMs: sum(v, (x) => x.ms), rotMs: sum(rot, (x) => x.ms),
+    cuts: Math.round(sum(v, (x) => (x.cpm * x.ms) / 60000)),
+    // a "thing learned" is a redeeming quality of a non brain rot video you actually watched for a few seconds
+    learned: sum(v.filter((x) => !x.rot && x.ms > 3000), (x) => x.good),
+    worst: [...rot].sort((a, b) => b.dmg - a.dmg)[0],
+  };
+}
+function allTime() {   // ended sessions plus the one in progress
+  const t = totals(session);
+  return { sessions: life.sessions + (t.videos ? 1 : 0), videos: life.videos + t.videos, rot: life.rot + t.rot,
+           watchMs: life.watchMs + t.watchMs, rotMs: life.rotMs + t.rotMs, since: life.sessions ? life.since : session.startedAt };
+}
+
+function endSession() {
+  const t = totals(session);
+  if (t.videos) {
+    if (!life.sessions) life.since = session.startedAt;
+    life.sessions++; life.videos += t.videos; life.rot += t.rot; life.watchMs += t.watchMs; life.rotMs += t.rotMs;
+    lastSession = session;
+    writeJSON(K_LIFE, life); writeJSON(K_LAST, lastSession);
+  }
+  const awayMin = (Date.now() - session.lastActiveAt) / 60000;
+  session = newSession(Math.max(0, session.damage - awayMin * HEAL_PER_MIN));   // the damage follows you, minus healing
+  saveSession(true);
+  updateMeter();
+}
+
+// Called whenever you're actively on the feed. Time away heals; a long enough gap starts a new session.
+function touch() {
+  const idle = Date.now() - session.lastActiveAt;
+  if (idle > SESSION_GAP) endSession();
+  else if (idle > 15000) heal((idle / 60000) * HEAL_PER_MIN);
+  session.lastActiveAt = Date.now();
+}
+function hurt(n, v) {
+  session.damage = Math.min(100, session.damage + n);
+  session.peak = Math.max(session.peak, session.damage);
+  if (v) v.dmg += n;
+}
+function heal(n) { session.damage = Math.max(0, session.damage - n); }
+
+// A video counts as scrolled through the moment it's on screen. Brain rot hits you on arrival (once per
+// session per video), unless Warn mode is holding it behind the gate.
+function recordView(it, gated) {
+  touch();
+  let v = session.views[it.id];
+  if (!v) v = session.views[it.id] = { rot: it.is_brain_rot, score: it.score, ms: 0, dmg: 0, hit: false,
+    cpm: it.signals?.cuts_per_minute || 0, good: it.redeeming.length, name: it.creator ? "@" + it.creator : it.id };
+  if (it.is_brain_rot && !v.hit && !gated) {
+    v.hit = true;
+    const n = it.score * 0.05;
+    hurt(n, v);
+    ouch(`−${n.toFixed(1)} brain`);
+  }
+  saveSession(true);
+  updateMeter();
+  return v;
+}
+
+function ouch(text) {
+  const o = $("ouch"), m = $("meter");
+  o.textContent = text;
+  o.classList.remove("show"); m.classList.remove("hit");
+  void o.offsetWidth;
+  o.classList.add("show"); m.classList.add("hit");
+}
+
+// Every 250 ms of actual playback: brain rot keeps draining you (twice as fast after 10 s on one video),
+// anything else slowly heals you.
+let lastTick = performance.now(), lastTier = tierOf(session.damage);
+setInterval(() => {
+  const now = performance.now(), dt = Math.min(1000, now - lastTick);
+  lastTick = now;
+  if (!current || document.hidden || current.classList.contains("gated")) return;
+  if (current.querySelector("video").paused || $("receipt").classList.contains("open")) return;
+  const it = byId(current.dataset.id);
+  if (!it) return;
+  touch();
+  const v = session.views[it.id] || recordView(it, false);
+  v.ms += dt;
+  if (it.is_brain_rot) hurt((it.score / 100) * (v.ms > 10000 ? 3 : 1.5) * (dt / 1000), v);
+  else heal(0.6 * (dt / 1000));
+  saveSession();
+  updateMeter();
+}, 250);
+addEventListener("pagehide", () => saveSession(true));
+document.addEventListener("visibilitychange", () => { if (document.hidden) saveSession(true); });
+
+function updateMeter() {
+  const d = session.damage, hp = 100 - d, tier = tierOf(d), t = totals(session), a = allTime(), m = $("meter");
+  m.style.setProperty("--hp", hp.toFixed(1));
+  // healthy pink fading to dead grey as the damage goes up
+  m.style.setProperty("--brain", `color-mix(in srgb, #ff8fb8 ${hp.toFixed(0)}%, #5d5d66)`);
+  m.dataset.tier = tier;
+  $("m-state").textContent = `${TIERS[tier][1]} · ${Math.round(hp)}%`;
+  $("m-count").innerHTML = `<b>${t.videos}</b> scrolled · <b class="rotn">${t.rot}</b> rot<br>all time <b>${a.videos}</b> · <b class="rotn">${a.rot}</b> rot`;
+  if (tier > lastTier) ouch(`Brain status: ${TIERS[tier][1].toUpperCase()}`);
+  lastTier = tier;
+}
+
+const clock = (ms) => {
+  const s = Math.round(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}` : `${m}:${String(r).padStart(2, "0")}`;
+};
+const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0) + "%";
+const when = (ts) => new Date(ts).toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+// The receipt for the current session, or (past = true) for the last ended one when you come back.
+function openReceipt(past = false) {
+  const s = past ? lastSession : session;
+  if (!s) return;
+  const t = totals(s), a = past ? life : allTime();
+  const ln = (k, v, cls = "") => `<div class="ln ${cls}"><span>${k}</span><span>${v}</span></div>`;
+  const w = t.worst;
+  const verdict = !t.videos ? "NOTHING WATCHED. SUSPICIOUSLY HEALTHY."
+    : t.learned === 0 ? "NO REFUNDS. YOUR ATTENTION HAS ALREADY BEEN SPENT."
+    : t.rot > t.videos / 2 ? "SOME LEARNING DETECTED. MOSTLY ROT THOUGH."
+    : "YOU LEARNED SOMETHING. THE ALGORITHM IS DISAPPOINTED.";
+  $("receipt").innerHTML = `<div class="paper">
+    <div class="c title">BRAIN ROT FEED</div>
+    <div class="c sub">${past ? "WELCOME BACK · YOUR LAST SESSION" : "SESSION RECEIPT · IN PROGRESS"}</div>
+    <div class="c sub">${when(s.startedAt)} – ${new Date(s.lastActiveAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+    <hr>
+    ${ln("Videos scrolled", t.videos)}
+    ${ln("Brain rot", `${t.rot} (${pct(t.rot, t.videos)})`, t.rot ? "bad" : "")}
+    ${ln("Not brain rot", t.videos - t.rot)}
+    ${ln("Time watching", clock(t.watchMs))}
+    ${ln("on brain rot", clock(t.rotMs), "ind")}
+    ${ln("Scene cuts sat through", t.cuts.toLocaleString())}
+    ${ln("Things learned", t.learned, t.learned ? "" : "bad")}
+    ${w ? `<hr><h4>WORST OFFENDER</h4>${ln(esc(w.name), `score ${w.score}`)}${ln("cost you", `${w.dmg.toFixed(1)} brain`, "ind bad")}` : ""}
+    <hr><h4>BRAIN DAMAGE</h4>
+    <div class="dmgbar"><span style="width:${s.damage.toFixed(1)}%"></span><i style="left:calc(${s.peak.toFixed(1)}% - 1px)" title="peak"></i></div>
+    ${ln("Started at", `${Math.round(s.startDamage)} (${tierName(s.startDamage)})`)}
+    ${ln("Peak", `${Math.round(s.peak)} (${tierName(s.peak)})`)}
+    ${ln(past ? "Left at" : "Now", `${Math.round(s.damage)} (${tierName(s.damage)})`, "big")}
+    <hr><h4>ALL TIME · ${a.sessions} SESSION${a.sessions === 1 ? "" : "S"} SINCE ${new Date(a.since).toLocaleDateString([], { day: "numeric", month: "short" }).toUpperCase()}</h4>
+    ${ln("Videos scrolled", a.videos.toLocaleString())}
+    ${ln("Brain rot", `${a.rot.toLocaleString()} (${pct(a.rot, a.videos)})`, a.rot ? "bad" : "")}
+    ${ln("Time on brain rot", clock(a.rotMs))}
+    <div class="fine">${verdict}</div>
+    <div class="barcode"></div>
+    <div class="acts">${past
+      ? `<button class="primary" data-close>Start scrolling</button>`
+      : `<button data-end>End session</button><button class="primary" data-close>Keep scrolling</button>`}</div>
+  </div><div class="tear"></div>`;
+  closeSheet();
+  current?.querySelector("video").pause();
+  $("receipt").classList.add("open"); $("scrim").classList.add("open");
+}
+function closeReceipt() {
+  if (!$("receipt").classList.contains("open")) return;
+  $("receipt").classList.remove("open"); $("scrim").classList.remove("open");
+  if (current && !current.classList.contains("gated")) current.querySelector("video").play().catch(() => {});
+}
+$("receipt").addEventListener("click", (e) => {
+  if (e.target.closest("[data-end]")) { endSession(); closeReceipt(); ouch("New session started"); }
+  else if (e.target.closest("[data-close]")) closeReceipt();
+});
+$("meter").addEventListener("click", () => openReceipt());
+
+// Coming back after the session timed out: close it out and show what it cost you.
+if (Date.now() - session.lastActiveAt > SESSION_GAP) {
+  const had = totals(session).videos;
+  endSession();
+  if (had) openReceipt(true);
+}
+updateMeter();
 
 function setMuted(m) {
   muted = m;
@@ -357,12 +614,14 @@ function scrollBy(dir) {
 }
 
 $("feed").addEventListener("click", (e) => {
+  if (e.target.closest("[data-receipt]")) return openReceipt();
   const el = e.target.closest(".slide");
   if (!el) return;
   const it = byId(el.dataset.id);
   if (e.target.closest("[data-why]")) return openSheet(it);
   if (e.target.closest("[data-allow]")) {
     allowed.add(it.id); applyGate(el);
+    recordView(it, false);   // choosing to watch it anyway is when the brain rot lands
     const v = el.querySelector("video"); v.muted = muted; v.play().catch(() => {});
     return;
   }
@@ -377,9 +636,11 @@ document.querySelector(".seg").addEventListener("click", (e) => {
   policy = b.dataset.policy; store.set("brf.policy", policy); render();
 });
 $("sound").addEventListener("click", () => setMuted(!muted));
-$("scrim").addEventListener("click", closeSheet);
+$("scrim").addEventListener("click", () => { closeSheet(); closeReceipt(); });
 addEventListener("keydown", (e) => {
-  if (e.key === "Escape") return closeSheet();
+  if (e.key === "Escape") { closeSheet(); return closeReceipt(); }
+  if (e.key === "r") return $("receipt").classList.contains("open") ? closeReceipt() : openReceipt();
+  if ($("receipt").classList.contains("open")) return;
   if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); scrollBy(1); }
   if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); scrollBy(-1); }
   if (e.key === "m") setMuted(!muted);
