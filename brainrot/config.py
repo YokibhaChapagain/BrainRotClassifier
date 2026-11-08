@@ -24,6 +24,10 @@ _load_dotenv()
 
 @dataclass
 class Settings:
+    # Which model provider classifies videos: "nvidia" (NVIDIA API catalog) or "gemini".
+    backend: str = field(default_factory=lambda: os.getenv("BRAINROT_BACKEND", "nvidia").strip().lower())
+    nvidia_api_key: str = field(default_factory=lambda: os.getenv("NVIDIA_API_KEY", ""))
+    nvidia_model: str = field(default_factory=lambda: os.getenv("NVIDIA_MODEL", "minimaxai/minimax-m3.1-flash"))
     api_key: str = field(default_factory=lambda: os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY", ""))
     model: str = field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-3.8-flash"))
     # "native": upload the whole video (frames + audio) to Gemini.
@@ -39,3 +43,11 @@ class Settings:
     # Only analyse the first N seconds (0 = whole video). Keeps cost bounded for long videos.
     max_seconds: float = field(default_factory=lambda: float(os.getenv("BRAINROT_MAX_SECONDS", "180")))
     temperature: float = 0.0
+
+    @property
+    def active_model(self) -> str:
+        return self.nvidia_model if self.backend == "nvidia" else self.model
+
+    @property
+    def has_api_key(self) -> bool:
+        return bool(self.nvidia_api_key if self.backend == "nvidia" else self.api_key)

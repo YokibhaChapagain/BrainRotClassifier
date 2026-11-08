@@ -50,15 +50,28 @@ def _format_signals(s: LocalSignals | None, missing: str = NO_SIGNALS_URL) -> st
     )
 
 
+def make_backend(settings: Settings) -> Backend:
+    """The model provider named by BRAINROT_BACKEND: "nvidia" (default) or "gemini"."""
+    if settings.backend == "nvidia":
+        from .nvidia_client import NvidiaBackend
+        return NvidiaBackend(settings.nvidia_api_key, settings.nvidia_model, settings.temperature)
+    if settings.backend == "gemini":
+        from .gemini_client import GeminiBackend
+        return GeminiBackend(settings.api_key, settings.model, settings.temperature)
+    raise ValueError(f"BRAINROT_BACKEND must be 'nvidia' or 'gemini', got {settings.backend!r}")
+
+
 class BrainRotClassifier:
     def __init__(self, settings: Settings | None = None, backend: Backend | None = None):
         self.settings = settings or Settings()
         if self.settings.mode not in MODES:
             raise ValueError(f"mode must be one of {MODES}, got {self.settings.mode!r}")
         if backend is None:
-            from .gemini_client import GeminiBackend
-            backend = GeminiBackend(self.settings.api_key, self.settings.model, self.settings.temperature)
+            backend = make_backend(self.settings)
         self.backend = backend
+        # a backend that can't take whole videos (NVIDIA) always gets keyframes
+        self.mode = self.settings.mode if getattr(backend, "supports_video", True) else "frames"
+        self.send_audio = getattr(backend, "supports_audio", True)
         self.prompt_template = resources.files("brainrot").joinpath("prompts/classify.txt").read_text()
 
     # ---------- public API ----------
@@ -70,7 +83,7 @@ class BrainRotClassifier:
         `context` is optional extra info, e.g. the post caption or hashtags."""
         src = str(source)
         if re.match(r"^https?://", src):
-            if YOUTUBE_RE.match(src) and self.settings.mode == "native" and not download:
+            if YOUTUBE_RE.match(src) and self.mode == "native" and not download:
                 return self._classify_youtube(src, context)
             with tempfile.TemporaryDirectory() as tmp:
                 path = _download(src, Path(tmp))
@@ -114,7 +127,7 @@ class BrainRotClassifier:
             brain_rot_score=verdict.brain_rot_score,
             threshold=self.settings.threshold,
             confidence=verdict.confidence,
-            mode=self.settings.mode,
+            mode=self.mode,
             model=self.backend.model,
             verdict=verdict,
             signals=signals,
@@ -130,12 +143,12 @@ class BrainRotClassifier:
     def _classify_file(self, path: Path, context: str, source_label: str) -> ClassificationResult:
         t0 = time.time()
         s = self.settings
-        want_frames = s.mode == "frames"
+        want_frames = self.mode == "frames"
         logger.info("Analysing %s locally", path.name)
         signals, keyframes = analyze_video(path, max_seconds=s.max_seconds, max_frames=s.max_frames,
                                            extract_keyframes=want_frames)
 
-        if s.mode == "native":
+        if self.mode == "native":
             clip = path
             with tempfile.TemporaryDirectory() as tmp:
                 if s.max_seconds and signals.duration_s >= s.max_seconds - 0.5:
@@ -152,9 +165,13 @@ class BrainRotClassifier:
         for kf in keyframes:
             parts.append(self.backend.text_part(f"Keyframe {kf.index} at {int(kf.timestamp // 60):02d}:{kf.timestamp % 60:04.1f}"))
             parts.append(self.backend.bytes_part(kf.jpeg, "image/jpeg"))
+        with_audio = signals.has_audio and self.send_audio
         note = (f"\nNote: you are seeing {len(keyframes)} keyframes sampled across the video"
-                f"{' plus its audio track' if signals.has_audio else ''}, not the full video.\n")
-        if signals.has_audio:
+                f"{' plus its audio track' if with_audio else ''}, not the full video.\n")
+        if signals.has_audio and not self.send_audio:
+            note += ("The video has sound, but you can't hear it: only images are provided. Judge pacing from "
+                     "the measurements above and content from the frames and any on-screen text.\n")
+        if with_audio:
             with tempfile.TemporaryDirectory() as tmp:
                 audio = extract_audio(path, Path(tmp) / "audio.mp3", s.max_seconds)
                 if audio:

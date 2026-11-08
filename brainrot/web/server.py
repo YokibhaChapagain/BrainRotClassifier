@@ -111,13 +111,16 @@ def media(name: str) -> FileResponse:
 @app.get("/api/config")
 def config() -> dict:
     s = Settings()
-    return {"model": s.model, "mode": s.mode, "threshold": s.threshold, "has_api_key": bool(s.api_key)}
+    mode = "frames" if s.backend == "nvidia" else s.mode  # NVIDIA only takes images
+    return {"backend": s.backend, "model": s.active_model, "mode": mode, "threshold": s.threshold,
+            "has_api_key": s.has_api_key}
 
 
 @app.get("/health")
 def health() -> dict:
     s = Settings()
-    return {"ok": True, "model": s.model, "threshold": s.threshold, "has_api_key": bool(s.api_key)}
+    return {"ok": True, "backend": s.backend, "model": s.active_model, "threshold": s.threshold,
+            "has_api_key": s.has_api_key}
 
 
 @app.post("/predict")

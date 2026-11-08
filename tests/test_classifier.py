@@ -71,4 +71,9 @@ def test_bad_mode(fake_backend):
 
 def test_no_api_key_gives_clear_error():
     with pytest.raises(RuntimeError, match="GEMINI_API_KEY"):
-        BrainRotClassifier(settings(mode="native"))
+        BrainRotClassifier(settings(mode="native", backend="gemini"))
+
+
+def test_no_nvidia_key_gives_clear_error():
+    with pytest.raises(RuntimeError, match="NVIDIA_API_KEY"):
+        BrainRotClassifier(settings(backend="nvidia", nvidia_api_key=""))

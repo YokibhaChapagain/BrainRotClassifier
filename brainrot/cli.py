@@ -34,10 +34,14 @@ def _expand(inputs: list[str]) -> list[str]:
 
 def _settings(args: argparse.Namespace) -> Settings:
     s = Settings()
+    if getattr(args, "backend", None):
+        s.backend = args.backend
     for name in ("model", "mode", "threshold", "max_frames", "max_seconds"):
         val = getattr(args, name, None)
         if val is not None:
             setattr(s, name, val)
+    if getattr(args, "model", None) and s.backend == "nvidia":
+        s.nvidia_model = args.model
     if getattr(args, "fps", None) is not None:
         s.native_fps = args.fps
     return s
@@ -174,7 +178,8 @@ def main(argv: list[str] | None = None) -> int:
 
     def common(p: argparse.ArgumentParser) -> None:
         p.add_argument("--mode", choices=["native", "frames"], help="native = send whole video (default); frames = keyframes + audio")
-        p.add_argument("--model", help="Gemini model id (default from GEMINI_MODEL)")
+        p.add_argument("--backend", choices=["nvidia", "gemini"], help="model provider (default from BRAINROT_BACKEND, else nvidia)")
+        p.add_argument("--model", help="model id (default from NVIDIA_MODEL or GEMINI_MODEL)")
         p.add_argument("--threshold", type=int, help="score >= threshold => brain rot (default 50)")
         p.add_argument("--max-frames", dest="max_frames", type=int, help="keyframes in frames mode (default 16)")
         p.add_argument("--max-seconds", dest="max_seconds", type=float, help="only analyse first N seconds (0 = all; default 180)")
