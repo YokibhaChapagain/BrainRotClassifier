@@ -179,3 +179,19 @@ def test_concurrent_writers_keep_each_others_entries(tmp_path, calm_video):
     for t in threads:
         t.join()
     assert sorted(feed.load_catalog(tmp_path)) == sorted(names)
+
+
+def test_feed_uses_captions_when_available(monkeypatch, tmp_path, calm_video, hyper_video):
+    import json as _json
+
+    d = _feed_folder(tmp_path, calm_video, hyper_video)
+    _patch(monkeypatch, {"a_calm.mp4": 10, "b_hyper.mp4": 90})
+    monkeypatch.setenv("BRAINROT_FEED_DIR", str(d))
+    monkeypatch.setenv("BRAINROT_MODE", "native")
+    assert cli.main(["index"]) == 0
+    (d / "captions.json").write_text(_json.dumps({"b_hyper.mp4": {"creator": "someone", "caption": "wait for it #fyp"}}))
+    items = {i["id"]: i for i in TestClient(server.app).get("/api/feed").json()["items"]}
+    assert items["b_hyper.mp4"]["creator"] == "someone" and items["b_hyper.mp4"]["caption"] == "wait for it #fyp"
+    assert items["a_calm.mp4"]["creator"] is None and items["a_calm.mp4"]["caption"] is None  # falls back to file name
+    (d / "captions.json").write_text("not json")
+    assert TestClient(server.app).get("/api/feed").status_code == 200

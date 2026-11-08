@@ -30,6 +30,7 @@ _thread_lock = threading.RLock()
 
 VIDEO_EXTS = {".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v", ".mpeg", ".mpg", ".3gp", ".flv", ".wmv"}
 CATALOG_NAME = "feed.json"
+CAPTIONS_NAME = "captions.json"
 
 
 def feed_dir() -> Path:
@@ -145,11 +146,28 @@ def safe_name(folder: Path, filename: str) -> str:
     return name
 
 
-def to_item(name: str, entry: dict) -> dict:
+def load_captions(folder: Path) -> dict[str, dict]:
+    """Optional captions.json beside the videos: {file name: {"creator": ..., "caption": ...}}, the post's
+    original caption and author. Videos without an entry just show their file name."""
+    path = folder / CAPTIONS_NAME
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except json.JSONDecodeError:
+        logger.warning("Ignoring unreadable %s", path)
+        return {}
+
+
+def to_item(name: str, entry: dict, meta: dict | None = None) -> dict:
     r = entry["result"]
     v = r["verdict"]
+    meta = meta if isinstance(meta, dict) else {}
     return {
         "id": name,
+        "creator": str(meta.get("creator") or "") or None,
+        "caption": str(meta.get("caption") or "") or None,
         "src": f"/media/{name}",
         "label": r["label"],
         "is_brain_rot": r["is_brain_rot"],
@@ -180,4 +198,5 @@ def feed_items(folder: Path) -> tuple[list[dict], list[str]]:
         else:
             pending.append(path.name)
     ready.sort(key=lambda ne: (-ne[1].get("uploaded_at", 0), ne[0]))
-    return [to_item(n, e) for n, e in ready], pending
+    captions = load_captions(folder)
+    return [to_item(n, e, captions.get(n)) for n, e in ready], pending

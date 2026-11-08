@@ -1,90 +1,168 @@
-# brainrot-classifier-prototype
+# Brain Rot Feed
 
-Classifies short videos as brain rot or not with Gemini, and a Chrome extension (`extension-counter/`) that counts brain rot videos while you scroll Instagram or TikTok.
+Brain Rot Feed uses Google Gemini to decide whether a short video is "brain rot": low-value, overstimulating content made only to hold your attention, such as Skibidi edits, Subway Surfers split-screens, AI slop and TTS Reddit stories. Each video gets a 0 to 100 score, seven criteria scores and a written explanation.
 
-## BrainRot Counter setup
+The repo has three parts:
 
-The extension sends each video to the Gemini model running on your own computer, so there are two parts: start the model, then load the extension.
+- **The classifier** (`brainrot/`): local video analysis plus one Gemini call per video.
+- **The demo feed** (`/feed`): a vertical, swipeable video feed where every video was classified ahead of time. This is how a platform would use it.
+- **A Chrome extension** (`extension-counter/`): counts brain rot videos while you scroll Instagram or TikTok.
 
-### 1. Get the code
+## How the app works
 
-Clone the repo, or download it as a zip and unzip it.
-
-### 2. Start the model
-
-You need Python 3.10 or newer. In the repo folder:
+A platform doesn't need to classify videos while people watch. It classifies each video **once, when it's uploaded**, stores the verdict, and reads that stored verdict every time someone scrolls past.
 
 ```
+ AT UPLOAD (once per video, ~10 s)                         WHILE SCROLLING (every view, instant)
+
+ video file ──► local analysis ──► Gemini ──► verdict  ═══► feed loads ──► policy ──► viewer sees
+                (OpenCV + ffmpeg)  (rubric,    stored in      the stored     Label /     score + "why"
+                keyframes, audio,   JSON out)  feed.json      verdicts       Warn / Hide  panel
+                cuts per minute
+```
+
+1. **A video arrives**, through the **+** button in the feed or the `brainrot index` command.
+2. **Local analysis** (no AI) measures how the video is edited and picks the frames worth sending.
+3. **Gemini classifies it.** It gets the keyframes, the audio, the measured pacing and a written rubric, and returns a structured verdict.
+4. **The verdict is stored** in `feed.json`, next to the video file.
+5. **The feed reads stored verdicts** and never calls Gemini while someone scrolls. That's why scrolling is instant even though one Gemini call takes about 10 seconds.
+6. **A policy decides what the viewer sees**: label every video, put flagged videos behind a warning screen, or hide them from the feed.
+
+## Quick start
+
+You need Python 3.10 or newer and ffmpeg (`brew install ffmpeg` on a Mac).
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env
 ```
 
-Copy `.env.example` to `.env` (`copy .env.example .env` on Windows, `cp .env.example .env` on Mac or Linux). Open `.env` and replace `your-key-here` with your Gemini API key from https://aistudio.google.com/apikey.
+Open `.env` and set `GEMINI_API_KEY` to a key from https://aistudio.google.com/apikey. Then:
 
-Start the server and leave the terminal open while you use the extension:
-
-```
+```bash
+python -m brainrot.cli index samples        # classify every video in samples/ once
 python -m uvicorn brainrot.web.server:app --port 8000
 ```
 
-Check it at http://localhost:8000/health. You should see `"ok": true` and `"has_api_key": true`.
+Open http://localhost:8000/feed.
 
-### 3. Load the extension in Chrome
+## Using the demo feed
 
-1. Go to `chrome://extensions`.
-2. Turn on Developer mode (top right).
-3. Click Load unpacked and select the `extension-counter` folder inside the repo. If you get "Manifest file is missing", you picked the folder above it.
-4. Click the puzzle-piece icon in the toolbar and pin BrainRot Counter.
+- **Add videos:** put `.mp4` files in `samples/`, which is gitignored, and run `python -m brainrot.cli index samples`. Videos that are already classified and unchanged are skipped, so you only pay for new ones. Use `--force` to re-classify everything, and `BRAINROT_FEED_DIR` to use a different folder.
+- **Captions:** if `samples/captions.json` exists (`{"file.mp4": {"creator": "...", "caption": "..."}}`), each video shows its creator's handle and original caption. Otherwise it shows the file name.
+- **Scroll:** swipe, or use the arrow keys or `j`/`k`. Tap a video to pause it, and press `m` or the speaker button to unmute.
+- **The score:** each video has a score circle on the right.
+    - For brain rot, the ring fills up to the score as the video starts and keeps pulsing until you tap it.
+    - For anything else, it just shows the score.
+    - Tapping it opens the explanation: Gemini's reasoning, the tropes it found, redeeming qualities, the 7 criteria and the measured cuts per minute.
+- **Policy toggle** (top bar):
+    - **Label:** show every video with its score.
+    - **Warn:** blur flagged videos behind a "Flagged as brain rot" screen with Skip and Watch anyway buttons.
+    - **Hide:** remove flagged videos from the feed. The end card says how many were filtered out.
+- **Add a video live:** press **+** or drop a video file onto the page. It uploads, Gemini classifies it ("Gemini is watching it…" with a timer), and it's added to the top of the feed with an "added" tag. From then on its verdict is stored like every other video's.
+- **Counter:** the bottom bar shows how many videos you've watched and how many of them were brain rot.
 
-### 4. Use it
+## Technical details
 
-- Open instagram.com/reels or tiktok.com and play a video. The counter appears in the top-right corner, and you can drag it anywhere.
-- After about 4 seconds it shows "asking the model…", and the video's score arrives a few seconds later. A score of 50 or more counts as brain rot.
-- Each video counts once, even if you scroll back to it. Videos you swipe past in under 4 seconds aren't counted.
-- Click the toolbar icon to turn the counter on or off, see today's numbers, or reset them. The badge on the icon shows today's brain rot count.
+### Local analysis (`brainrot/signals.py`)
 
-### If something's wrong
+This runs before Gemini, with OpenCV and ffmpeg, and costs nothing:
 
-| What you see | What to do |
+- **Pacing:** the video is sampled at 8 frames per second and each sample is shrunk to 160 px wide. A **scene cut** is counted when the colour histograms of two consecutive samples correlate below 0.55, or the mean pixel difference is above 40. From this it computes cuts per minute, average in-shot motion, and whether the video is vertical.
+- **Audio:** ffprobe and ffmpeg check for a sound track and measure its average loudness.
+- **Keyframes:** the first 180 seconds are split into N equal segments (`BRAINROT_MAX_FRAMES`). Each segment contributes its most-changing frame, so the whole video is covered and the frames land on cuts and action. Each frame is resized to at most 768 px and saved as a JPEG.
+
+These numbers go into the prompt. Gemini only sees a handful of frames, so it can't count fast cuts itself; the measured cuts per minute tell it how hyper-edited the video really is.
+
+### The Gemini call (`brainrot/classifier.py`, `brainrot/gemini_client.py`)
+
+- **Frames mode** (`BRAINROT_MODE=frames`) sends the keyframes, each with its timestamp, plus a 32 kbps mono MP3 of the audio, all inline in a single request.
+- **Native mode** (`BRAINROT_MODE=native`) uploads the whole video through the Gemini File API instead (trimmed to 180 seconds). Gemini samples it at `BRAINROT_NATIVE_FPS` frames per second, with sound. Public YouTube links are passed to Gemini by URL.
+- **The prompt** (`brainrot/prompts/classify.txt`) defines brain rot, lists 7 criteria, explicitly lists what is *not* brain rot (fast but skilled edits, educational content, comedy with a real premise) to avoid false positives, and includes the measured pacing.
+- **Structured output:** the call sets `response_mime_type="application/json"` and passes a JSON schema generated from the Pydantic model `GeminiVerdict`, so Gemini must return:
+
+| Field | Meaning |
 | --- | --- |
-| "model offline" | The server from step 2 isn't running, or isn't on port 8000. |
-| Popup says the API key isn't set | Check `.env`, then restart the server. |
-| No counter on the page | Refresh the Instagram or TikTok tab. The extension only attaches to pages opened after it was installed. |
-| "model error" | Read the error in the server terminal. |
-| You pulled new code | Click the reload arrow on the BrainRot Counter card in `chrome://extensions`, then refresh the tab. |
+| `brain_rot_score` | 0 to 100. At or above `BRAINROT_THRESHOLD` (default 50), the video is brain rot |
+| `criteria` | 0 to 10 each: overstimulation, low informational value, incoherence/absurdism, meme slang density, split-screen/filler gameplay, AI slop/TTS, engagement bait |
+| `detected_tropes`, `redeeming_qualities` | Named evidence for and against |
+| `content_summary`, `reasoning` | What the video shows and why it got that score |
+| `confidence` | 0 to 1, lower when the evidence is thin |
 
-Everyone runs the model locally with their own key, because the extension looks for it at `localhost:8000`. To use a shared, deployed server instead, set `API_URL` in `extension-counter/config.js` to its address and skip step 2.
+- **Reliability:** temperature is 0 so scores are repeatable. Errors 429, 500, 502, 503 and 504 are retried with exponential backoff (2, 4, 8, 16 s). Running out of the daily quota fails immediately with a clear message, because retrying for seconds can't help.
 
-More detail on how the extension counts and what `/predict` returns is in [`extension-counter/README.md`](extension-counter/README.md).
+### Storage (`brainrot/feed.py`)
 
-## Demo feed (pre-classified)
+- `samples/feed.json` maps each file name to its verdict, plus the file's size and modification time. If a video file changes, its verdict no longer matches, and the video is marked pending until it's indexed again.
+- Writes are atomic (write to a temporary file, then rename), so the server never reads a half-written file. They also take a file lock and merge only their own entry, so an `index` run and live uploads can write at the same time without losing each other's work.
+- Uploads get a cleaned file name: only safe characters, and `-2`, `-3` and so on if the name is taken. A failed upload deletes its file, so the feed never shows a video without a verdict.
 
-This is how a platform would use the classifier: every video is scored once, ahead of time, and the stored verdict is read while people scroll. There's no waiting and no model call at view time.
+### Web server (`brainrot/web/server.py`, FastAPI)
 
-1. Put some videos in `samples/`. The folder is gitignored, so the videos stay out of the repo.
-2. Classify them once. Unchanged videos are skipped on later runs, so you only pay for new ones:
-   ```
-   python -m brainrot.cli index samples
-   ```
-3. Start the server (as in step 2 above) and open http://localhost:8000/feed.
+| Endpoint | What it does |
+| --- | --- |
+| `GET /feed` | The demo feed page |
+| `GET /api/feed` | Stored verdicts and captions for every classified video, plus any still pending |
+| `GET /media/{name}` | Streams a video from the feed folder, with Range support for seeking. Only files in the folder are served |
+| `POST /api/feed/upload` | Saves an uploaded video, classifies it once, stores the verdict, and returns the new feed item |
+| `GET /` and `POST /api/classify` | Single-video classifier page: upload a file or paste a URL |
+| `POST /predict_clip`, `POST /predict` | Used by the browser extension: a recorded clip, or screenshots. Answers are cached by video ID |
+| `GET /health`, `GET /api/config` | Model, threshold and whether an API key is set |
 
-Swipe or use the arrow keys to move between videos. Tap a video to pause it, and press `m` or the speaker button to unmute. The toggle at the top switches what the "platform" does with flagged videos:
+### Feed page (`brainrot/web/templates/feed.html`)
 
-- **Label**: show every video with its verdict.
-- **Warn**: blur flagged videos behind a "watch anyway" screen.
-- **Hide**: drop flagged videos from the feed.
+A single HTML file with no framework.
 
-To show a live classification, press **+** (or drop a video file onto the page). The video uploads, Gemini classifies it once (you'll see "Gemini is watching it…" with a timer), and it's added to the top of the feed with an "added" tag. After that its verdict is stored like every other video's, so it's never classified again.
+- **Playback:** CSS scroll snapping gives one video per screen. An `IntersectionObserver` plays the video that's at least 60% visible, pauses the others, and preloads the next one.
+- **Animations:** the score ring is a CSS `conic-gradient` driven by a custom property that JavaScript counts up from 0. The pulse and the screen-edge flash are CSS animations, and they switch off for people whose system is set to reduce motion.
+- **Uploads:** `XMLHttpRequest` reports upload progress, then the card switches to "Gemini is watching it…".
 
-On the free Gemini tier, each model allows only 20 requests per day, which covers `index` runs and uploads together. Plan the demo around that, or enable billing on the key.
+## Browser extension
 
-The score button opens the full explanation: the reasoning, tropes, the 7 criteria and the locally measured cuts per minute. Verdicts are stored in `samples/feed.json`. Use `--force` to re-classify everything, and set `BRAINROT_FEED_DIR` to use a different folder.
+The extension counts brain rot videos while you scroll Instagram or TikTok. It needs the server from the Quick start running at `localhost:8000`.
+
+1. Go to `chrome://extensions` and turn on Developer mode.
+2. Click Load unpacked and select the `extension-counter` folder.
+3. Open instagram.com/reels or tiktok.com and play a video. A draggable counter appears in the corner.
+
+By default it records the first 8 seconds of the video you're watching, sound included, straight from the page's video player, and sends that clip to `/predict_clip`. This adds no requests to Instagram or TikTok. If a video can't be recorded, it falls back to 8 screenshots sent to `/predict`. Each video counts once per day. More detail is in [`extension-counter/README.md`](extension-counter/README.md).
 
 ## Command line
 
+```bash
+python -m brainrot.cli classify video.mp4      # one or more files, folders or URLs; --json for raw output
+python -m brainrot.cli index samples           # pre-classify a folder for the demo feed
+python -m brainrot.cli eval labels.csv         # accuracy against a labelled CSV (source,label[,context])
+python -m brainrot.cli serve                   # web server on port 8000
 ```
-pip install -e .
-brainrot classify video.mp4            # one or more files, folders or URLs
-brainrot eval labels.csv               # accuracy against a labelled CSV (source,label[,context])
-brainrot index samples/                # pre-classify a folder for the demo feed
-brainrot serve                         # web UI, /feed demo and the extension's API on port 8000
+
+`classify`, `index` and `eval` also accept `--mode`, `--threshold`, `--max-frames`, `--max-seconds` and `--model`.
+
+## Settings (`.env`)
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | | Your Gemini API key |
+| `GEMINI_MODEL` | `gemini-3.8-flash` | Any Gemini model that accepts video |
+| `BRAINROT_MODE` | `native` | `native` (whole video) or `frames` (keyframes + audio) |
+| `BRAINROT_THRESHOLD` | `50` | Score at or above which a video is brain rot |
+| `BRAINROT_MAX_FRAMES` | `16` | Keyframes sent in frames mode |
+| `BRAINROT_MAX_SECONDS` | `180` | Only the first N seconds are analysed |
+| `BRAINROT_NATIVE_FPS` | `2` | Frames per second Gemini samples in native mode |
+| `BRAINROT_FEED_DIR` | `samples` | Folder the demo feed reads |
+
+## Tests
+
+```bash
+python -m pytest
 ```
+
+The tests create their own small videos with ffmpeg and use a fake Gemini backend, so they need no API key and make no network calls.
+
+## Limits
+
+- On the free Gemini tier, each model allows 20 requests per day, shared by `index` runs and live uploads. Enable billing for more.
+- Frames mode sees a handful of frames rather than every frame; the measured pacing makes up for some of that, and native mode sends the whole video.
+- A verdict reflects one model's judgement against a written rubric. Check it against videos labelled by people with `brainrot eval` before relying on it.

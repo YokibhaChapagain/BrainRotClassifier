@@ -39,63 +39,41 @@
   .slide video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; transition: filter .25s; }
   .slide.gated video { filter: blur(28px) brightness(.55); }
 
-  .badge { position: absolute; z-index: 5; left: 12px; top: calc(58px + env(safe-area-inset-top)); display: inline-flex; align-items: center; gap: 7px;
-           padding: 6px 11px 6px 9px; border-radius: 999px; font-weight: 700; font-size: 13px; background: var(--glass);
-           border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-  .badge .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 30%, transparent); }
-  .badge .n { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 600; }
-  .badge.rot { --c: var(--rot); } .badge.ok { --c: var(--ok); }
-
   .rail { position: absolute; z-index: 7; right: 10px; bottom: calc(110px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 14px; align-items: center; }
-  .rail button { border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; text-shadow: 0 1px 2px #000; }
-  .rail .circle { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: var(--glass); border: 1px solid var(--line); }
-  .rail .score { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--c); }
-  .rail svg { width: 22px; height: 22px; }
+  .rail button { position: relative; border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; text-shadow: 0 1px 2px #000; }
+  .rail .circle { position: relative; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--glass); border: 1px solid var(--line); }
+  .rail .score { position: relative; font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--c); }
+  .rail .lbl { position: relative; z-index: 1; color: var(--muted); }
 
-  /* ---------- presentation polish: the verdict lands, the why button asks to be clicked ---------- */
-  /* badge stamps in each time its video comes on screen */
-  .slide.active .badge { animation: badge-in .6s cubic-bezier(.2, 1.5, .4, 1) both; }
-  @keyframes badge-in { 0% { opacity: 0; transform: translateY(-10px) scale(.55); } 100% { opacity: 1; transform: none; } }
-  .slide.active .badge .dot { animation: dot-ping 1.5s ease-out .6s infinite; }
-  @keyframes dot-ping { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c) 75%, transparent); } 100% { box-shadow: 0 0 0 9px transparent; } }
-  /* brain rot: the badge glows and the screen edge flashes red once */
-  .slide.active .badge.rot { animation: badge-in .6s cubic-bezier(.2, 1.5, .4, 1) both, rot-glow 2.2s ease-in-out .7s infinite; }
-  @keyframes rot-glow { 0%, 100% { box-shadow: 0 0 0 0 transparent; border-color: var(--line); }
-                        50% { box-shadow: 0 0 22px 2px color-mix(in srgb, var(--rot) 55%, transparent); border-color: var(--rot); } }
+  /* ---------- presentation polish ---------- */
+  /* the screen edge flashes once when a video comes on screen: red for brain rot, green otherwise */
   .slide::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0; }
   .slide.active.rot::after { box-shadow: inset 0 0 90px 8px color-mix(in srgb, var(--rot) 70%, transparent); animation: edge-flash 1.6s ease-out .15s both; }
   .slide.active.ok::after { box-shadow: inset 0 0 70px 4px color-mix(in srgb, var(--ok) 45%, transparent); animation: edge-flash 1.3s ease-out .15s both; }
   @keyframes edge-flash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
 
-  /* score ring fills up to the score while the number counts up */
-  .rail .ring { position: relative; background: conic-gradient(var(--c) calc(var(--p, 0) * 1%), rgba(255, 255, 255, .13) 0); border: 0; }
+  /* the ring fills to the score: red and counting up for brain rot, green and static otherwise */
+  .rail .ring { background: conic-gradient(var(--c) calc(var(--p, 0) * 1%), rgba(255, 255, 255, .13) 0); border: 0; }
   .rail .ring::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: #121216; }
-  .rail .ring .score { position: relative; }
 
-  /* why button: pulses with an expanding halo and a hint bubble until it's been opened */
-  .rail .why .circle { position: relative; }
-  .rail .why.pulse .circle { border-color: var(--accent); color: var(--accent); animation: why-bob 1.6s ease-in-out infinite; }
-  .rail .why.pulse .circle::after, .rail .why.pulse .circle::before { content: ""; position: absolute; inset: -2px; border-radius: 50%;
-      border: 2px solid var(--accent); animation: why-halo 1.6s ease-out infinite; }
-  .rail .why.pulse .circle::before { animation-delay: .8s; }
-  @keyframes why-halo { 0% { transform: scale(.95); opacity: .9; } 100% { transform: scale(1.75); opacity: 0; } }
-  @keyframes why-bob { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 60%, transparent); } }
-  .rail .why.pulse .lbl { color: var(--accent); }
-  .why-tip { position: absolute; right: 58px; top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 12px; font-weight: 700;
-             padding: 6px 10px; border-radius: 10px; background: var(--accent); color: #0b0b0d; pointer-events: none; opacity: 0; }
-  .why-tip::after { content: ""; position: absolute; right: -5px; top: 50%; margin-top: -5px; border: 5px solid transparent; border-right: 0; border-left-color: var(--accent); }
-  body:not(.why-opened) .slide.active .why.pulse .why-tip { animation: tip-in .4s ease-out 1.2s both, tip-nudge 1.6s ease-in-out 1.6s infinite; }
-  @keyframes tip-in { from { opacity: 0; transform: translate(8px, -50%); } to { opacity: 1; transform: translate(0, -50%); } }
-  @keyframes tip-nudge { 0%, 100% { transform: translate(0, -50%); } 50% { transform: translate(-5px, -50%); } }
-  .rail .why { position: relative; }
+  /* brain rot only, until tapped: a slight swell and glow, with red ripples drawn behind the circle so the
+     score and its label stay readable */
+  .rail .pulse .circle { isolation: isolate; animation: score-bob 1.2s ease-in-out infinite;
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--rot) 45%, transparent), 0 0 18px 3px color-mix(in srgb, var(--rot) 50%, transparent); }
+  .rail .pulse .circle::after, .rail .pulse .halo2, .rail .pulse .halo3 { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 50%;
+      pointer-events: none; border: 2.5px solid var(--rot); animation: score-halo 1.8s cubic-bezier(.2, .6, .3, 1) infinite; }
+  .rail .pulse .halo2 { animation-delay: .6s; }
+  .rail .pulse .halo3 { animation-delay: 1.2s; }
+  @keyframes score-halo { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(1.7); opacity: 0; } }
+  @keyframes score-bob { 0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.06); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rot) 65%, transparent), 0 0 28px 6px color-mix(in srgb, var(--rot) 70%, transparent); } }
+  .rail .pulse .lbl { color: var(--rot); font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 
   @media (prefers-reduced-motion: reduce) {
-    .slide.active .badge, .slide.active .badge .dot, .slide.active .badge.rot, .slide.active::after,
-    .rail .why.pulse .circle, .rail .why.pulse .circle::after, .rail .why.pulse .circle::before { animation: none !important; }
-    body:not(.why-opened) .slide.active .why.pulse .why-tip { animation: none; opacity: 1; }
+    .slide.active::after, .rail .pulse .circle, .rail .pulse .circle::after, .rail .pulse .halo2, .rail .pulse .halo3 { animation: none !important; }
   }
 
-  .caption { position: absolute; z-index: 4; inset: auto 70px 0 0; padding: 40px 14px calc(18px + env(safe-area-inset-bottom));
+  .caption { position: absolute; z-index: 4; inset: auto 0 0 0; padding: 40px 80px calc(18px + env(safe-area-inset-bottom)) 14px;
              background: linear-gradient(transparent, rgba(0,0,0,.75)); }
   .caption .name { font-weight: 700; margin-bottom: 4px; text-shadow: 0 1px 2px #000; overflow-wrap: anywhere; }
   .caption .sum { color: #e6e6ea; font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-shadow: 0 1px 2px #000; }
@@ -200,7 +178,6 @@
 const ICON = {
   muted: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>',
   sound: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>',
-  info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
   play: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>',
 };
 const CRIT = {
@@ -220,8 +197,18 @@ const seen = new Map();      // id -> is_brain_rot, for the session counter
 const opened = new Set();    // videos whose "why" panel was opened: their button stops pulsing
 let observer = null;
 
-function badge(it) {
-  return `<div class="badge ${it.is_brain_rot ? "rot" : "ok"}"><span class="dot"></span>${it.is_brain_rot ? "Brain rot" : "Not brain rot"}<span class="n">${it.score}</span></div>`;
+// Ring filled to the score. Brain rot: red, counts up and pulses until tapped. Otherwise: green and still.
+function scoreButton(it) {
+  const rot = it.is_brain_rot, pulse = rot && !opened.has(it.id);
+  return `<button data-why class="score-btn ${pulse ? "pulse" : ""}" aria-label="Score ${it.score} out of 100: see why">
+    <span class="circle ring" style="--c:${rot ? "var(--rot)" : "var(--ok)"};--p:${it.score}">${pulse ? '<span class="halo2"></span><span class="halo3"></span>' : ""}<span class="score">${it.score}</span></span>
+    <span class="lbl">${rot ? "brain rot" : "score"}</span></button>`;
+}
+
+function captionHtml(it) {
+  const added = it.uploaded ? '<span class="new-tag">added</span>' : "";
+  if (!it.caption) return `<div class="name">${esc(it.id)}${added}</div>`;
+  return `<div class="name">${it.creator ? "@" + esc(it.creator) : esc(it.id)}${added}</div><div class="sum">${esc(it.caption)}</div>`;
 }
 
 function slide(it) {
@@ -229,12 +216,8 @@ function slide(it) {
   return `<section class="slide ${it.is_brain_rot ? "rot" : "ok"}" data-id="${esc(it.id)}">
     <video src="${esc(it.src)}" loop playsinline muted preload="metadata"></video>
     <div class="tap-hint">${ICON.play}</div>
-    ${badge(it)}
-    <div class="rail">
-      <button data-why aria-label="Why this verdict"><span class="circle ring" style="--c:${it.is_brain_rot ? "var(--rot)" : "var(--ok)"};--p:${it.score}"><span class="score">${it.score}</span></span>score</button>
-      <button data-why class="why ${opened.has(it.id) ? "" : "pulse"}" aria-label="Why Gemini gave this verdict"><span class="why-tip">Why ${it.score}? Tap</span><span class="circle">${ICON.info}</span><span class="lbl">why?</span></button>
-    </div>
-    <div class="caption"><div class="name">${esc(it.id)}${it.uploaded ? '<span class="new-tag">added</span>' : ""}</div><div class="sum">${esc(it.summary)}</div></div>
+    <div class="rail">${scoreButton(it)}</div>
+    <div class="caption">${captionHtml(it)}</div>
     <div class="gate"><div class="card">
       <h2>Flagged as brain rot</h2>
       <p>Our classifier scored this ${it.score}/100 before it was ever shown to you.</p>
@@ -305,8 +288,9 @@ function activate(el) {
   el.classList.remove("active");
   void el.offsetWidth; // reflow so the animations replay when you scroll back to a video
   el.classList.add("active");
-  const ring = el.querySelector(".ring"), num = ring.querySelector(".score");
-  const target = byId(el.dataset.id).score;
+  const ring = el.querySelector(".ring");
+  if (!ring || !el.classList.contains("rot")) return; // only brain rot animates; the green ring is already filled
+  const num = ring.querySelector(".score"), target = byId(el.dataset.id).score;
   if (reduceMotion) { ring.style.setProperty("--p", target); num.textContent = target; return; }
   const t0 = performance.now(), dur = 900;
   const step = (t) => {
@@ -326,7 +310,7 @@ function updateStats() {
   const vals = [...seen.values()];
   const rot = vals.filter(Boolean).length;
   $("stats").textContent = items.length
-    ? `${vals.length} watched · ${rot} brain rot · ${items.filter((i) => i.is_brain_rot).length}/${items.length} in catalog flagged`
+    ? `${vals.length} watched · ${rot} brain rot`
     : "";
 }
 
@@ -339,8 +323,9 @@ function setMuted(m) {
 
 function openSheet(it) {
   opened.add(it.id);
-  document.body.classList.add("why-opened"); // the "Tap" hint bubble has done its job
-  document.querySelector(`.slide[data-id="${CSS.escape(it.id)}"] .why`)?.classList.remove("pulse");
+  const btn = document.querySelector(`.slide[data-id="${CSS.escape(it.id)}"] .score-btn`);
+  btn?.classList.remove("pulse");
+  btn?.querySelectorAll(".halo2, .halo3").forEach((h) => h.remove());
   const c = it.is_brain_rot ? "var(--rot)" : "var(--ok)";
   const crit = Object.entries(it.criteria).map(([k, n]) => {
     const col = n >= 7 ? "var(--rot)" : n >= 4 ? "var(--warn)" : "var(--ok)";
