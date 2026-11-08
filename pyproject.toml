@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "brainrot-detector"
+version = "0.1.0"
+description = "Classify videos as brain rot or not using Gemini"
+requires-python = ">=3.10"
+dependencies = [
+  "google-genai>=1.0",
+  "opencv-python-headless>=4.8",
+  "numpy",
+  "pydantic>=2",
+  "fastapi",
+  "uvicorn",
+  "python-multipart",
+]
+
+[project.optional-dependencies]
+urls = ["yt-dlp"]
+dev = ["pytest"]
+
+[project.scripts]
+brainrot = "brainrot.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["brainrot*"]
+
+[tool.setuptools.package-data]
+brainrot = ["prompts/*.txt", "web/templates/*.html"]

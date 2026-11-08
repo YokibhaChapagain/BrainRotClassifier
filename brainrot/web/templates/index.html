@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brain Rot Detector</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --card: #ffffff; --ink: #1c1c1e; --muted: #6b6b70; --line: #e3e3e0;
+    --accent: #3b5bdb; --rot: #d6336c; --ok: #2f9e44; --warn: #e8890c; --track: #ececea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141416; --card: #1e1e21; --ink: #ececef; --muted: #9a9aa2; --line: #2e2e33;
+            --accent: #7b93ff; --rot: #ff6b9a; --ok: #5fd07a; --warn: #ffb347; --track: #2a2a2e; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  label { display: block; font-weight: 600; font-size: 13px; margin: 0 0 6px; }
+  input[type=text], input[type=url], select, textarea {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg); color: var(--ink); font: inherit; }
+  textarea { min-height: 54px; resize: vertical; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+  @media (max-width: 600px) { .row { grid-template-columns: 1fr; } }
+  .drop { border: 2px dashed var(--line); border-radius: 10px; padding: 24px; text-align: center;
+          color: var(--muted); cursor: pointer; transition: border-color .15s; }
+  .drop.over, .drop:hover { border-color: var(--accent); }
+  .drop strong { color: var(--ink); }
+  .or { text-align: center; color: var(--muted); margin: 12px 0; font-size: 13px; }
+  button { margin-top: 18px; width: 100%; padding: 12px; border: 0; border-radius: 8px; background: var(--accent);
+           color: #fff; font: 600 15px system-ui, sans-serif; cursor: pointer; }
+  button:disabled { opacity: .55; cursor: progress; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .warn { background: color-mix(in srgb, var(--warn) 15%, transparent); border-color: var(--warn); }
+  .err { color: var(--rot); white-space: pre-wrap; }
+  .verdict { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .gauge { --v: 0; --c: var(--ok); width: 112px; height: 112px; border-radius: 50%; flex: none;
+           background: conic-gradient(var(--c) calc(var(--v) * 1%), var(--track) 0); display: grid; place-items: center; }
+  .gauge > div { width: 86px; height: 86px; border-radius: 50%; background: var(--card); display: grid; place-items: center;
+                 font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .label { font-size: 24px; font-weight: 750; letter-spacing: .02em; }
+  .meta { color: var(--muted); font-size: 13px; }
+  h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 8px; }
+  .crit { display: grid; grid-template-columns: 230px 1fr 26px; gap: 10px; align-items: center; margin: 5px 0; font-size: 14px; }
+  @media (max-width: 600px) { .crit { grid-template-columns: 1fr 26px; } .crit .bar { grid-column: 1 / -1; grid-row: 2; } }
+  .bar { height: 8px; background: var(--track); border-radius: 4px; overflow: hidden; }
+  .bar > span { display: block; height: 100%; border-radius: 4px; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { padding: 3px 10px; border-radius: 999px; font-size: 13px; border: 1px solid var(--line); }
+  .chip.bad { border-color: var(--rot); color: var(--rot); }
+  .chip.good { border-color: var(--ok); color: var(--ok); }
+  .signals { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+  .sig { background: var(--bg); border-radius: 8px; padding: 10px; }
+  .sig b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .sig span { font-size: 12px; color: var(--muted); }
+  details { margin-top: 14px; } summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  pre { overflow-x: auto; font-size: 12px; background: var(--bg); padding: 12px; border-radius: 8px; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff6; border-top-color: #fff;
+             border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Brain Rot Detector</h1>
+  <p class="sub">Upload a video or paste a link. Gemini watches it and decides whether it's brain rot.</p>
+
+  <div id="keywarn" class="card warn" hidden>
+    <b>No Gemini API key configured.</b> Set <code>GEMINI_API_KEY</code> in your environment or <code>.env</code> and restart the server.
+  </div>
+
+  <form id="form" class="card">
+    <div id="drop" class="drop">
+      <input id="file" type="file" accept="video/*" hidden>
+      <div id="dropText"><strong>Drop a video here</strong> or click to choose</div>
+    </div>
+    <div class="or">or</div>
+    <label for="url">Video URL</label>
+    <input id="url" type="url" placeholder="https://www.youtube.com/shorts/...  (TikTok / Instagram also work via yt-dlp)">
+
+    <div class="row">
+      <div>
+        <label for="mode">Mode</label>
+        <select id="mode">
+          <option value="native">Native: Gemini watches the full video + audio</option>
+          <option value="frames">Frames: keyframes + audio (cheaper)</option>
+        </select>
+      </div>
+      <div>
+        <label for="threshold">Threshold: <span id="thVal">50</span></label>
+        <input id="threshold" type="range" min="1" max="99" value="50" style="width:100%">
+        <div class="hint">Score at or above this is labelled brain rot.</div>
+      </div>
+    </div>
+    <div style="margin-top:14px">
+      <label for="context">Extra context (optional)</label>
+      <textarea id="context" placeholder="Caption, hashtags, where you found it..."></textarea>
+    </div>
+    <button id="go" type="submit">Analyse video</button>
+  </form>
+
+  <div id="out"></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let chosen = null;
+
+fetch("/api/config").then(r => r.json()).then(c => {
+  $("keywarn").hidden = c.has_api_key;
+  $("mode").value = c.mode; $("threshold").value = c.threshold; $("thVal").textContent = c.threshold;
+});
+
+$("threshold").oninput = (e) => $("thVal").textContent = e.target.value;
+$("drop").onclick = () => $("file").click();
+$("file").onchange = (e) => pick(e.target.files[0]);
+["dragover", "dragenter"].forEach(ev => $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.remove("over"); }));
+$("drop").addEventListener("drop", e => pick(e.dataTransfer.files[0]));
+
+function pick(f) {
+  if (!f) return;
+  chosen = f; $("url").value = "";
+  $("dropText").innerHTML = `<strong>${esc(f.name)}</strong> · ${(f.size / 1e6).toFixed(1)} MB <span class="hint">(click to change)</span>`;
+}
+$("url").oninput = () => { if ($("url").value) { chosen = null; $("dropText").innerHTML = "<strong>Drop a video here</strong> or click to choose"; } };
+
+$("form").onsubmit = async (e) => {
+  e.preventDefault();
+  if (!chosen && !$("url").value.trim()) { $("out").innerHTML = `<div class="card err">Choose a file or paste a URL.</div>`; return; }
+  const fd = new FormData();
+  if (chosen) fd.append("file", chosen);
+  fd.append("url", $("url").value.trim());
+  fd.append("mode", $("mode").value);
+  fd.append("threshold", $("threshold").value);
+  fd.append("context", $("context").value);
+  $("go").disabled = true;
+  $("go").innerHTML = `<span class="spinner"></span>Analysing… (uploads + Gemini can take 20–90s)`;
+  $("out").innerHTML = "";
+  try {
+    const r = await fetch("/api/classify", { method: "POST", body: fd });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || r.statusText);
+    render(data);
+  } catch (err) {
+    $("out").innerHTML = `<div class="card err">${esc(err.message)}</div>`;
+  } finally {
+    $("go").disabled = false; $("go").textContent = "Analyse video";
+  }
+};
+
+const LABELS = { ai_slop_or_tts: "AI slop / TTS", split_screen_or_filler_gameplay: "Split-screen / filler gameplay", incoherence_absurdism: "Incoherence / absurdism" };
+const nice = (k) => LABELS[k] || k.replace(/_/g, " ").replace(/^./, c => c.toUpperCase());
+const barColour = (v) => v >= 7 ? "var(--rot)" : v >= 4 ? "var(--warn)" : "var(--ok)";
+
+function render(d) {
+  const v = d.verdict, rot = d.is_brain_rot, s = d.signals;
+  const colour = rot ? "var(--rot)" : d.brain_rot_score >= d.threshold - 15 ? "var(--warn)" : "var(--ok)";
+  const crit = Object.entries(v.criteria).map(([k, n]) =>
+    `<div class="crit"><div>${nice(k)}</div><div class="bar"><span style="width:${n*10}%;background:${barColour(n)}"></span></div><div class="num">${n}</div></div>`).join("");
+  const chips = (arr, cls) => arr.length ? `<div class="chips">${arr.map(t => `<span class="chip ${cls}">${esc(t)}</span>`).join("")}</div>` : `<div class="meta">None</div>`;
+  const sig = s ? `<h3>Measured signals</h3><div class="signals">
+      <div class="sig"><b>${s.duration_s.toFixed(0)}s</b><span>duration</span></div>
+      <div class="sig"><b>${s.cuts_per_minute}</b><span>cuts / minute</span></div>
+      <div class="sig"><b>${s.mean_motion}</b><span>in-shot motion</span></div>
+      <div class="sig"><b>${s.mean_volume_db ?? "–"}${s.mean_volume_db != null ? " dB" : ""}</b><span>mean volume</span></div>
+      <div class="sig"><b>${s.width}×${s.height}</b><span>${s.is_vertical ? "vertical" : "horizontal"}</span></div>
+    </div>` : `<h3>Measured signals</h3><div class="meta">Not available (YouTube URL analysed directly by Gemini).</div>`;
+  $("out").innerHTML = `<div class="card">
+    <div class="verdict">
+      <div class="gauge" style="--v:${d.brain_rot_score};--c:${colour}"><div>${d.brain_rot_score}</div></div>
+      <div>
+        <div class="label" style="color:${colour}">${rot ? "BRAIN ROT" : "NOT BRAIN ROT"}</div>
+        <div class="meta">Score ${d.brain_rot_score}/100 · threshold ${d.threshold} · confidence ${Math.round(d.confidence*100)}%</div>
+        <div class="meta">${esc(d.source)} · ${esc(d.mode)} · ${esc(d.model)} · ${d.elapsed_s}s</div>
+      </div>
+    </div>
+    <h3>What's in the video</h3><div>${esc(v.content_summary)}</div>
+    <h3>Criteria (0–10)</h3>${crit}
+    <h3>Brain rot tropes</h3>${chips(v.detected_tropes, "bad")}
+    <h3>Redeeming qualities</h3>${chips(v.redeeming_qualities, "good")}
+    ${sig}
+    <h3>Reasoning</h3><div>${esc(v.reasoning)}</div>
+    <details><summary>Raw JSON</summary><pre>${esc(JSON.stringify(d, null, 2))}</pre></details>
+  </div>`;
+}
+</script>
+</body>
+</html>
